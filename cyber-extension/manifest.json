@@ -5,16 +5,24 @@
   "manifest_version": 3,
   "action": {
     "default_popup": "index.html",
-    "default_icon": "images/hi_icon.png"
+    "default_icon": "images/hacker.png"
+  },
+  "background": {
+    "service_worker": "background.js"
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';"
   },
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage",
+    "tabs",
+    "cookies"
   ],
   "host_permissions": [
-    "https://your-fl-coordinator.com/"
+    "http://127.0.0.1:5000/*",
+    "*://*.google.com/",
+    "*://*/"
   ]
 }
