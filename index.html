@@ -1,0 +1,394 @@
+<style>
+      body{
+        font-family: "Courier New", Courier, monospace;
+        font-size:18px;
+        min-width: 1500px;
+        min-height: 750px;
+        padding-top: 50px;
+        margin: 0px;
+        background-color: #ebeca5;
+        border-radius: 30px;
+        overflow: auto;
+      }
+      #resize-handle {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 25px;
+        height: 25px;
+        background-color: #88888800;
+        cursor: se-resize;
+        z-index: 10;
+        border-top: 0px solid #fff;
+        border-left: 0px solid #fff;
+      }
+      #top-nav {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        background-color: #c7cef7;
+        color: rgb(0, 0, 0);
+        position: fixed;
+        width: 100%;
+        top:0;
+        z-index: 2;
+      }
+      #hamburger-icon {
+        cursor: pointer;
+        margin-right: 20px;
+      }
+      #container{
+        display: flex;
+        margin-top: 60px; /* Height of the top nav */
+      }
+      #sidebar {
+        height: calc(100% - 60px); /* Adjust height for top nav */
+        width: 80px;
+        position: fixed;
+        z-index: 1;
+        top: 60px; /* Position below top nav */
+        left: 0;
+        background-color: #f8d2ff;
+        overflow-x: hidden;
+        transition: 0.5s;
+        box-sizing: border-box;
+        padding-top: 30px;
+      }
+      #sidebar ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        word-break: break-all;
+      }
+      #sidebar a {
+        padding: 8px 8px 8px 32px;
+        text-decoration: none;
+        font-size: 20px;
+        color: #251010;
+        display: flex;
+        align-items: center;
+        transition: 0.3s;
+        white-space: nowrap;
+      }
+      #sidebar a img {
+        margin-right: 15px;
+        padding-right:20px;
+      }
+      #sidebar a:hover {
+        color: #818181;
+      }
+      #sidebar.sidebar-open a {
+        white-space: normal;
+      }
+      #main-content {
+        transition: margin-left .5s;
+        padding: 16px;
+        flex-grow: 1;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+      }
+      input:checked + .slider {
+        background-color: #2196F3;
+      }
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+      .slider.round {
+        border-radius: 34px;
+      }
+      .slider.round:before {
+        border-radius: 50%;
+      }
+      #status {
+        margin-top: 10px;
+        font-style: italic;
+      }
+      .info {
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      #confidence {
+        margin-top: 10px;
+        font-weight: bold;
+        color: #333;
+      }
+      .chatInput{
+        border-radius: 100px;
+      }
+      .cookie-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .cookie-table th, .cookie-table td {
+        border: 1px solid black;
+        padding: 5px;
+        word-break: break-all;
+        align-items: center;
+        text-align: center;
+        width:200px;
+      }
+      .content-section {
+        margin-left: 80px;
+        transition: margin-left 0.5s;
+      }
+      /* Chatbox Styles */
+      .chat-log {
+        height: 350px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        background-color: #fff;
+        border-radius: 5px;
+      }
+      .chat-log .user-message, .chat-log .bot-message {
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+      }
+      .chat-log .user-message { justify-content: flex-end; }
+      .chat-log .bot-message { justify-content: flex-start; }
+
+      /* Add icons using pseudo-elements */
+      .chat-log .bot-message::before {
+        content: "";
+        width: 30px;
+        height: 30px;
+        background-image: url('images/bot_icon.png');
+        background-size: cover;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+      }
+      .chat-log .user-message::after {
+        content: "";
+        width: 30px;
+        height: 30px;
+        background-image: url('images/user_icon.png');
+        background-size: cover;
+        border-radius: 50%;
+        margin-left: 10px;
+        flex-shrink: 0;
+      }
+      
+      .chat-log .message-content {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 15px;
+        max-width: 80%;
+        word-wrap: break-word;
+        white-space: pre-wrap; /* This will make the browser render newline characters */
+      }
+      .user-message .message-content { 
+        background-color: #dcf8c6; 
+      }
+      .bot-message .message-content { 
+        background-color: #89ecc3; 
+        border: 1px solid #20e281;
+      }
+      .chat-input-area { display: flex; gap: 10px; }
+      #chatInput {
+        flex-grow: 1;
+      }
+      /*Dashboard*/
+      .metric-card{
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        background: #c3f8fc; 
+        padding-left: 20px;
+        padding-right: 20px;
+        border-radius: 8px; 
+        flex: 1; 
+        text-align: center; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .dashboard-metrics{
+        flex-direction: column;
+      }
+
+    </style>
+    <script src="scripts/chart.js"></script>
+  </head>
+  <body>
+    <div id="top-nav">
+      <div id="hamburger-icon">
+        <img src="images/hamburger icon.png" alt="Menu" width="30" style="padding-left: 20px;">
+      </div>
+      <img src="images/Hacker.png" width="75"></img>
+      <h2 style="padding-left: 20px;">Cybersecurity Browser Extension</h2>
+    </div>
+    <div id="container">
+      <div id="sidebar">
+        <ul>
+          <li id="dashboard-link"><a href="#"><img src="images/dashboard.png" width="30">Dashboard</a></li>
+          <li id="analyse-url-link"><a href="#"><img src="images/Analyse URL.png" width="30"> Analyse URL</a></li>
+          <li id="website-auditing-link"><a href="#"><img src="images/Chatbot for website auditing.png" width="30">AI Powered Website Auditing</a></li>
+          <li id="malicious-content-analyser-link"><a href="#"><img src="images/mobile-app_1765888.png" width="30"> Malicious Website Content Analyser</a></li>
+          <li id="cookies-analyzer-link"><a href="#"><img src="images/analyse cookies.png" width="30"> Cookies Analyzer</a></li>
+          <li id="report-phishing-link"><a href="#"><img src="images/report issues.png" width="30">Report Phishing Website</a></li>
+        </ul>
+      </div>
+
+      <div id="dashboard-content" class="content-section" style="padding: 16px; flex-grow: 1; padding-left:40px">
+        <h2>Dashboard</h2>
+        
+        <!-- Metrics Cards -->
+        <div class="dashboard-metrics" style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <div class="metric-card" style="background: #cc6666; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3>Total Scanned</h3>
+                <p id="total-scanned" style="font-size: 24px; font-weight: bold;">0</p>
+            </div>
+            <div class="metric-card" style="background: #fff; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3>Phishing</h3>
+                <p id="phishing-detected" style="font-size: 24px; font-weight: bold; color: #d9534f;">0</p>
+            </div>
+            <div class="metric-card" style="background: #fff; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3>Legitimate</h3>
+                <p id="legitimate-sites" style="font-size: 24px; font-weight: bold; color: #5cb85c;">0</p>
+            </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="chart-container" style="background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 300px;">
+            <canvas id="threatChart"></canvas>
+        </div>
+
+        <!-- Recent Activity Table -->
+        <div class="recent-activity" style="background: #f5bef7; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3>Recent Activity Log</h3>
+            <div style="overflow-x: auto; max-height: 300px;">
+                <table id="activity-table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background-color: #f5bef7; position: sticky; top: 0;">
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Time</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">URL / Type</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Result</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+
+      <div id="analyse-url-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Phishing URL Analyser</h2>
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+          <label class="switch">
+            <input type="checkbox" id="protectionToggleURL">
+            <span class="slider round"></span>
+          </label>
+          <span style="margin-left: 10px;">Analyse URLs</span>
+        </div>
+        <h3>Analysis Status:</h3>
+        <div class="info">
+          <div id="status">Protection is OFF</div>
+          <br>
+          <div id="confidence"></div>
+        </div>
+      </div>
+
+      <div id="website-auditing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h3>Chat with AI Assistant for Website Auditing</h3>
+        <div id="chatLog" class="chat-log"></div>
+        <div class="chat-input-area">
+          <input style="padding-top: 5px; padding-bottom: 5px;" type="text" id="chatInput" placeholder="     Ask Starcoder 2..." class="chatInput">
+          <button id="sendMessage">Send Message</button>
+          <button id="clearChat">Clear Chat</button>
+        </div>
+      </div>
+
+      <div id="cookie-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Cookies Analyzer</h2>
+        <p>Retrieved Cookies for Current Website:</p><div></div>
+        <div id="cookie-list"></div>
+      </div>
+      
+
+      <div id="malicious-content-analyser-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Malicious Website Content Analyser</h2>
+        <p>Malicious content analysis functionality will be here.</p>
+        <form>
+          
+          <input type="checkbox" id="warning"name="warning" value="warning">
+          <label for="warning">Warning and Highlight Malicious Content</label><br>
+
+
+          <div style="display: flex; align-items: center; margin-top: 10px;">
+            <label class="switch">
+              <input type="checkbox" id="protectionToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Remove & Hidden Malicious Content</span>
+          </div>
+        </form>
+
+      </div>
+
+      <div id="report-phishing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Report Phishing Website</h2>
+        <br><br>
+        <form id="report-url" action="" method="post">
+        <h2>Enter the URLs</h2>  
+        <input type="text" id="report-url" placeholder="Enter URL to report">
+        <br><br>
+        <label for="report_website">Select the Type of the Website:</label>
+        <br>
+        <select name="report_website",id="report_website">
+          <option value="phishing">Phishing Website</option>
+          <option value="legitimate">Legitimate Website</option>
+        </select>
+        <br>
+        <button style="margin-top: 50px;"class="submit-error" type="submit">Submit</button>
+        </form>
+
+      </div>
+
+    </div>
+
+      <img src="images/expand.png" alt="Expand" width="30" height="30" id="resize-handle">
+    
+    <script src="scripts/popup.js"></script>
+    <script src="scripts/resize.js"></script>
+  </body>
+</html>
