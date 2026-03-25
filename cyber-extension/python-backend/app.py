@@ -1,17 +1,22 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 import re
+import json
+import threading
+import requests as http_req
 import pandas as pd
 import os
 import torch
 from transformers import (
-    DistilBertForSequenceClassification, 
-    DistilBertTokenizer, 
-    AutoModelForCausalLM, 
-    AutoTokenizer, 
-    pipeline, 
-    StoppingCriteria, 
+    DistilBertForSequenceClassification,
+    DistilBertTokenizer,
+    MobileBertForSequenceClassification,
+    MobileBertTokenizer,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    pipeline,
+    StoppingCriteria,
     StoppingCriteriaList,
     BitsAndBytesConfig
 )
@@ -44,8 +49,43 @@ os.environ['TRANSFORMERS_CACHE'] = 'X:/AI_Models'
 app = Flask(__name__)
 CORS(app)
 
+# --- Path constants (resolved from app.py location, not working directory) ---
+_BACKEND_DIR   = os.path.dirname(os.path.abspath(__file__))
+_EXTENSION_DIR = os.path.dirname(_BACKEND_DIR)
+
+MODEL_PATHS = {
+    'distilbert': os.path.join(_EXTENSION_DIR, 'model', 'Distil BERT'),
+    'mobilebert': os.path.join(_EXTENSION_DIR, 'model', 'Mobile BERT'),
+}
+
+REPORTED_DATA_PATH = os.path.join(_BACKEND_DIR, 'reported_data.json')
+KB_CSV_PATH = os.path.join(_EXTENSION_DIR, 'Knowledge Base', 'Knowledge Base.csv')
+
+# --- Federated learning module ---
+from federated.fl_training import (
+    run_federated_training,
+    run_cloud_federated_training,
+    run_gcp_federated_training,
+    get_status as get_fl_status,
+)
+
 # Global variable to store analysis history for dashboard purpose
 analysis_history = []
+
+# --- Model Loading Helper ---
+def load_phishing_model(model_name='distilbert'):
+    """Loads the tokenizer and model for the specified architecture."""
+    load_dir = MODEL_PATHS.get(model_name, MODEL_PATHS['distilbert'])
+    if model_name == 'mobilebert':
+        tokenizer = MobileBertTokenizer.from_pretrained(load_dir)
+        model = MobileBertForSequenceClassification.from_pretrained(load_dir)
+    else:
+        tokenizer = DistilBertTokenizer.from_pretrained(load_dir)
+        model = DistilBertForSequenceClassification.from_pretrained(load_dir)
+    model.eval()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    return tokenizer, model, device
 
 # --- Phishing Detection Feature Functions ---
 def extract_url_features(url):
@@ -105,7 +145,7 @@ def clean_response(response_text):
 print("Initializing RAG Chatbot...")
 
 # 1. Load Q&A data from CSV
-csv_path = 'C:/Users/Yap Zheng Xian/Documents/Programming/Extension/notebook/notebook/Dataset.csv'
+csv_path = 'C:/Users/Yap Zheng Xian/Documents/Programming/Extension/cyber-extension/Knowledge Base/Knowledge Base.csv'
 try:
     df = pd.read_csv(csv_path, encoding='utf-8')
     if 'question' not in df.columns or 'output' not in df.columns:
@@ -128,7 +168,7 @@ except Exception as e:
 
 # 2. Setup Embeddings and Vector Store (LanceDB)
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-db = lancedb.connect("./RAGData_Backend") # Store DB in backend folder
+db = lancedb.connect("./Knowledge Base/RAGData_Backend") # Store DB in backend folder
 table_name = "code_repo_backend"
 if table_name in db.table_names():
     db.drop_table(table_name)
@@ -261,79 +301,57 @@ def chat():
 def predict():
     data = request.get_json()
     raw_url_data = data.get('url', '')
+    model_name = data.get('model', 'distilbert')
     url = clean_and_extract_url(raw_url_data)
     print(url)
 
-    # Use the same path used for saving!
-    LOAD_DIRECTORY = "./cyber-extension/model" 
+    try:
+        tokenizer, model, device = load_phishing_model(model_name)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load model "{model_name}": {str(e)}'}), 500
 
-    # Load the tokenizer
-    tokenizer = DistilBertTokenizer.from_pretrained(LOAD_DIRECTORY)
-
-    # Load the fine-tuned model
-    model = DistilBertForSequenceClassification.from_pretrained(LOAD_DIRECTORY)
-
-    # Set the model to evaluation mode
-    model.eval()
-
-    # Move the model to the GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-
-    # --- Continue with your inference steps ---
     encoding = tokenizer.encode_plus(
-
         url,
-        max_length=128,          # Match your training max_length
+        max_length=128,
         padding='max_length',
         truncation=True,
         return_attention_mask=True,
-        return_tensors='pt'      
+        return_tensors='pt'
     )
 
-
-    # 2. Make the Prediction
     input_ids = encoding['input_ids'].to(device)
     attention_mask = encoding['attention_mask'].to(device)
 
     with torch.no_grad():
-
         output = model(input_ids, attention_mask=attention_mask)
-
         logits = output.logits
-
         probabilities = torch.softmax(logits, dim=1)
-
         predicted_class_id = torch.argmax(probabilities).item()
-
         confidence = probabilities[0, predicted_class_id].item() * 100
-
-    # 3. Interpret the Result
 
     result = "PHISHING / MALICIOUS" if predicted_class_id == 1 else "LEGITIMATE / SAFE"
 
-    # Save to local variable for dashboard purpose
     analysis_history.append({
         'url': url,
         'prediction': result,
         'confidence': confidence,
+        'model': model_name,
         'timestamp': time.time()
     })
 
-    return jsonify({'url': url, 'prediction': result, 'confidence': f"{confidence:.2f}%"})
+    return jsonify({'url': url, 'prediction': result, 'confidence': f"{confidence:.2f}%", 'model': model_name})
 
 @app.route('/batch_predict', methods=['POST'])
 def batch_predict():
     data = request.get_json()
     urls = data.get('urls', [])
+    model_name = data.get('model', 'distilbert')
     phishing_links = []
 
-    LOAD_DIRECTORY = "./cyber-extension/model"
-    tokenizer = DistilBertTokenizer.from_pretrained(LOAD_DIRECTORY)
-    model = DistilBertForSequenceClassification.from_pretrained(LOAD_DIRECTORY)
-    model.eval()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+    try:
+        tokenizer, model, device = load_phishing_model(model_name)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load model "{model_name}": {str(e)}'}), 500
 
     for raw_url in urls:
         url = clean_and_extract_url(raw_url)
@@ -353,15 +371,15 @@ def batch_predict():
             probabilities = torch.softmax(logits, dim=1)
             predicted_class_id = torch.argmax(probabilities).item()
 
-            if predicted_class_id == 1: # Phishing
+            if predicted_class_id == 1:  # Phishing
                 confidence = probabilities[0, predicted_class_id].item()
                 phishing_links.append({'url': url, 'confidence': confidence})
 
-    # Save to local variable for dashboard purpose
     analysis_history.append({
         'type': 'batch',
         'phishing_links': phishing_links,
         'total_scanned': len(urls),
+        'model': model_name,
         'timestamp': time.time()
     })
 
@@ -478,5 +496,311 @@ def get_history():
     """Returns the analysis history for the Streamlit dashboard."""
     return jsonify(analysis_history)
 
+
+# --- Federated Learning Endpoints ---
+
+@app.route('/report', methods=['POST'])
+def report():
+    """Store a user-submitted model-error report for federated fine-tuning."""
+    data = request.get_json()
+    url        = (data.get('url') or '').strip()
+    model_name = data.get('model', 'distilbert')
+    label      = int(data.get('label', 0))   # 0 = legitimate, 1 = phishing
+
+    if not url:
+        return jsonify({'error': 'URL is required'}), 400
+    if model_name not in MODEL_PATHS:
+        return jsonify({'error': f'Unknown model: {model_name}'}), 400
+
+    entry = {
+        'url':       url,
+        'model':     model_name,
+        'label':     label,
+        'timestamp': time.time(),
+    }
+
+    # Load → append → save
+    if os.path.isfile(REPORTED_DATA_PATH):
+        with open(REPORTED_DATA_PATH, 'r', encoding='utf-8') as fh:
+            reports = json.load(fh)
+    else:
+        reports = []
+
+    reports.append(entry)
+    with open(REPORTED_DATA_PATH, 'w', encoding='utf-8') as fh:
+        json.dump(reports, fh, indent=2)
+
+    model_count = sum(1 for r in reports if r.get('model') == model_name)
+    return jsonify({
+        'status':        'saved',
+        'total_reports': len(reports),
+        'model_reports': model_count,
+    })
+
+
+@app.route('/report_count', methods=['GET'])
+def report_count():
+    """Return how many reports exist for a given model."""
+    model_name = request.args.get('model', 'distilbert')
+    if not os.path.isfile(REPORTED_DATA_PATH):
+        return jsonify({'count': 0})
+    with open(REPORTED_DATA_PATH, 'r', encoding='utf-8') as fh:
+        reports = json.load(fh)
+    count = sum(1 for r in reports if r.get('model') == model_name)
+    return jsonify({'count': count})
+
+
+@app.route('/fl_train', methods=['POST'])
+def fl_train():
+    """
+    Start a federated learning training run in the background.
+
+    JSON body fields:
+      model      : 'distilbert' | 'mobilebert'   (default: distilbert)
+      rounds     : int                             (default: 3)
+      mode       : 'local' | 'cloud'              (default: local)
+      cloud_url  : ngrok URL from Colab            (required when mode=cloud)
+    """
+    status = get_fl_status()
+    if status.get('state') == 'running':
+        return jsonify({
+            'status':  'already_running',
+            'message': 'FL training is already in progress.',
+        }), 409
+
+    data       = request.get_json()
+    model_name = data.get('model', 'distilbert')
+    num_rounds = int(data.get('rounds', 3))
+    mode       = data.get('mode', 'local')
+    cloud_url  = (data.get('cloud_url') or '').strip()
+
+    if model_name not in MODEL_PATHS:
+        return jsonify({'error': f'Unknown model: {model_name}'}), 400
+
+    if mode == 'cloud':
+        if not cloud_url:
+            return jsonify({'error': 'cloud_url is required when mode=cloud'}), 400
+        t = threading.Thread(
+            target=run_cloud_federated_training,
+            args=(cloud_url, model_name, num_rounds),
+            daemon=True,
+        )
+        t.start()
+        return jsonify({
+            'status':    'started',
+            'mode':      'cloud',
+            'model':     model_name,
+            'rounds':    num_rounds,
+            'cloud_url': cloud_url,
+        })
+
+    if mode == 'gcp':
+        gcp_url = (data.get('gcp_url') or '').strip()
+        api_key = (data.get('api_key') or '').strip()
+        if not gcp_url:
+            return jsonify({'error': 'gcp_url is required when mode=gcp'}), 400
+        t = threading.Thread(
+            target=run_gcp_federated_training,
+            args=(gcp_url, model_name, num_rounds, api_key),
+            daemon=True,
+        )
+        t.start()
+        return jsonify({
+            'status':  'started',
+            'mode':    'gcp',
+            'model':   model_name,
+            'rounds':  num_rounds,
+            'gcp_url': gcp_url,
+        })
+
+    # Default: local simulation
+    t = threading.Thread(
+        target=run_federated_training,
+        args=(model_name, num_rounds),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({
+        'status': 'started',
+        'mode':   'local',
+        'model':  model_name,
+        'rounds': num_rounds,
+    })
+
+
+@app.route('/fl_status', methods=['GET'])
+def fl_status():
+    """Return the current FL training status."""
+    return jsonify(get_fl_status())
+
+
+@app.route('/scan_page', methods=['POST'])
+def scan_page():
+    """Fetch a page URL, extract all HTTP links, run batch prediction, return per-URL results."""
+    data = request.get_json()
+    page_url = (data.get('url') or '').strip()
+    model_name = data.get('model', 'distilbert')
+
+    if not page_url:
+        return jsonify({'error': 'url is required'}), 400
+    if model_name not in MODEL_PATHS:
+        return jsonify({'error': f'Unknown model: {model_name}'}), 400
+
+    # 1. Fetch the page HTML
+    try:
+        resp = http_req.get(
+            page_url, timeout=10,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0'}
+        )
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch page: {str(e)}'}), 502
+
+    # 2. Extract unique HTTP/HTTPS links
+    soup = BeautifulSoup(html, 'html.parser')
+    seen = set()
+    http_links = []
+    for tag in soup.find_all('a', href=True):
+        href = tag['href'].strip()
+        # Resolve relative URLs against the page URL
+        resolved = urljoin(page_url, href)
+        if resolved.startswith('http://') or resolved.startswith('https://'):
+            if resolved not in seen:
+                seen.add(resolved)
+                http_links.append(resolved)
+
+    if not http_links:
+        return jsonify({'results': [], 'total_scanned': 0, 'timestamp': time.time()})
+
+    # 3. Load model and predict each link
+    try:
+        tokenizer, model, device = load_phishing_model(model_name)
+    except Exception as e:
+        return jsonify({'error': f'Failed to load model: {str(e)}'}), 500
+
+    results = []
+    for url in http_links:
+        encoding = tokenizer.encode_plus(
+            url, max_length=128, padding='max_length',
+            truncation=True, return_attention_mask=True, return_tensors='pt'
+        )
+        input_ids      = encoding['input_ids'].to(device)
+        attention_mask = encoding['attention_mask'].to(device)
+
+        with torch.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)
+            probs  = torch.softmax(output.logits, dim=1)
+            pred   = torch.argmax(probs).item()
+            conf   = probs[0, pred].item()
+
+        results.append({
+            'url':        url,
+            'label':      'PHISHING' if pred == 1 else 'LEGITIMATE',
+            'confidence': round(conf * 100, 2),
+        })
+
+    return jsonify({
+        'results':       results,
+        'total_scanned': len(results),
+        'timestamp':     time.time(),
+    })
+
+
+# --- Knowledge Base Management Endpoints ---
+
+def _rebuild_lancedb():
+    """Re-read KB_CSV_PATH and rebuild the LanceDB vector store + RAG chain."""
+    global vector_store, rag_chain
+    try:
+        df = pd.read_csv(KB_CSV_PATH, encoding='utf-8')
+        docs = [
+            Document(
+                page_content=f"Archived Question: {row['question']}\n\nArchived Answer:\n{row['output']}",
+                metadata={"source": f"CSV Row {i}", "original_question": row['question']}
+            )
+            for i, row in df.iterrows()
+        ]
+        if table_name in db.table_names():
+            db.drop_table(table_name)
+        vector_store = LanceDB.from_documents(docs, embeddings, connection=db, table_name=table_name)
+        # Rebuild RAG chain if LLM is initialised
+        try:
+            new_har = create_history_aware_retriever(llm, vector_store.as_retriever(), contextualize_q_prompt)
+            new_cdc = create_stuff_documents_chain(llm, qa_prompt)
+            rag_chain = create_retrieval_chain(new_har, new_cdc)
+            print(f"[KB] LanceDB rebuilt with {len(docs)} entries and RAG chain updated.")
+        except NameError:
+            print(f"[KB] LanceDB rebuilt with {len(docs)} entries (LLM not available).")
+        return len(docs)
+    except Exception as e:
+        print(f"[KB] Rebuild failed: {e}")
+        raise
+
+
+@app.route('/kb/rows', methods=['GET'])
+def kb_rows():
+    """Return all rows in the Knowledge Base CSV."""
+    try:
+        df = pd.read_csv(KB_CSV_PATH, encoding='utf-8')
+        return jsonify({'rows': df[['question', 'output']].to_dict('records'), 'total': len(df)})
+    except FileNotFoundError:
+        return jsonify({'rows': [], 'total': 0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/kb/add', methods=['POST'])
+def kb_add():
+    """Append a new Q&A row to the CSV and rebuild LanceDB."""
+    data = request.get_json()
+    question = (data.get('question') or '').strip()
+    output   = (data.get('output')   or '').strip()
+    if not question or not output:
+        return jsonify({'error': 'Both question and output are required.'}), 400
+    try:
+        try:
+            df = pd.read_csv(KB_CSV_PATH, encoding='utf-8')
+        except FileNotFoundError:
+            df = pd.DataFrame(columns=['question', 'output'])
+        new_row = pd.DataFrame([{'question': question, 'output': output}])
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_csv(KB_CSV_PATH, index=False, encoding='utf-8')
+        total = _rebuild_lancedb()
+        return jsonify({'status': 'added', 'total': total})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/kb/delete', methods=['POST'])
+def kb_delete():
+    """Delete a row by 0-based index, save CSV and rebuild LanceDB."""
+    data = request.get_json()
+    try:
+        idx = int(data.get('index'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'index must be an integer'}), 400
+    try:
+        df = pd.read_csv(KB_CSV_PATH, encoding='utf-8')
+        if idx < 0 or idx >= len(df):
+            return jsonify({'error': f'Index {idx} out of range (0–{len(df)-1})'}), 400
+        df = df.drop(index=idx).reset_index(drop=True)
+        df.to_csv(KB_CSV_PATH, index=False, encoding='utf-8')
+        total = _rebuild_lancedb()
+        return jsonify({'status': 'deleted', 'total': total})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/kb/rebuild', methods=['POST'])
+def kb_rebuild():
+    """Manually trigger a LanceDB rebuild from the current CSV."""
+    try:
+        total = _rebuild_lancedb()
+        return jsonify({'status': 'rebuilt', 'total': total})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-  app.run(debug=True, port=5000)
+  app.run(debug=True, port=5000, use_reloader=False)
