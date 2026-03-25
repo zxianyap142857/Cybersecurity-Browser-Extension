@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const toggleMain = document.getElementById('protectionToggle');
   const toggleURL = document.getElementById('protectionToggleURL');
+  const toggleWarning = document.getElementById('warningToggle');
   const statusDiv = document.getElementById('status');
   const confidenceDiv = document.getElementById('confidence');
   const hamburgerIcon = document.getElementById('hamburger-icon');
@@ -41,14 +42,23 @@ document.addEventListener('DOMContentLoaded', () => {
     showContent('dashboard-content');
     loadDashboardData();
   });
-  document.getElementById('analyse-url-link').addEventListener('click', () => showContent('analyse-url-content'));
+  document.getElementById('analyse-url-link').addEventListener('click', () => {
+    showContent('analyse-url-content');
+    loadBatchScanResults();
+  });
+  document.getElementById('knowledge-base-management-link').addEventListener('click', () => {
+    showContent('knowledge-base-management-content');
+    loadKbRows();
+  });
   document.getElementById('website-auditing-link').addEventListener('click', () => showContent('website-auditing-content'));
   document.getElementById('malicious-content-analyser-link').addEventListener('click', () => showContent('malicious-content-analyser-content'));
-  document.getElementById('report-phishing-link').addEventListener('click', () => showContent('report-phishing-content'));
-  document.getElementById('cookies-analyzer-link').addEventListener('click', () => {
-    showContent('cookie-content');
-    displayCookies();
+  document.getElementById('report-phishing-link').addEventListener('click', () => {
+    showContent('report-phishing-content');
+    const sel = document.getElementById('report-model-select');
+    if (sel) fetchReportCount(sel.value);
+    fetchFlStatus();
   });
+  document.getElementById('cookies-analyzer-link').addEventListener('click', () => showContent('cookie-content'));
 
 
   function updateUI(result) {
@@ -76,12 +86,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Model selector persistence
+  const modelSelect = document.getElementById('model-select');
+  if (modelSelect) {
+    chrome.storage.local.get(['selectedModel'], (data) => {
+      if (data.selectedModel) modelSelect.value = data.selectedModel;
+    });
+    modelSelect.addEventListener('change', () => {
+      chrome.storage.local.set({ selectedModel: modelSelect.value });
+    });
+  }
+
   // Initialize the popup's UI based on stored state
-  chrome.storage.local.get(['protectionEnabled', 'analysisResult'], (data) => {
-    if (toggleMain) toggleMain.checked = !!data.protectionEnabled;
-    if (toggleURL) toggleURL.checked = !!data.protectionEnabled;
-    statusDiv.textContent = data.protectionEnabled ? 'Phishing Content Removal is ON' : 'Phishing Content Removal is OFF';
-    if (data.protectionEnabled) {
+  chrome.storage.local.get(['protectionEnabled', 'warningEnabled', 'urlScanningEnabled', 'analysisResult'], (data) => {
+    var protectionOn = !!data.protectionEnabled;
+    var warningOn = !!data.warningEnabled;
+    var urlScanningOn = !!data.urlScanningEnabled;
+
+    if (toggleMain) toggleMain.checked = protectionOn;
+    if (toggleURL) toggleURL.checked = urlScanningOn;
+    if (toggleWarning) toggleWarning.checked = warningOn;
+
+    if (protectionOn) {
+      statusDiv.textContent = 'Phishing Content Removal is ON';
+    } else if (warningOn) {
+      statusDiv.textContent = 'Warning & Highlight is ON';
+    } else if (urlScanningOn) {
+      statusDiv.textContent = 'URL Scanning is ON';
+    } else {
+      statusDiv.textContent = 'Protection is OFF';
+    }
+
+    if (data.protectionEnabled || data.warningEnabled || data.urlScanningEnabled) {
       updateUI(data.analysisResult);
       if (!data.analysisResult) {
         confidenceDiv.innerHTML = '<i>Waiting for analysis...</i>';
@@ -89,29 +125,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Listen for changes in storage
-  chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && changes.analysisResult) {
-      // Update UI only if protection is still enabled
-      chrome.storage.local.get('protectionEnabled', (data) => {
-        if (data.protectionEnabled) {
-          updateUI(changes.analysisResult.newValue);
-        }
-      });
-    }
-  });
 
-  // Handle toggle switch changes
-  const handleToggleChange = (event) => {
-    const isEnabled = event.target.checked;
-    if (toggleMain) toggleMain.checked = isEnabled;
-    if (toggleURL) toggleURL.checked = isEnabled;
+  // Function to update state and UI
+  function updateProtectionState(protectionEnabled, warningEnabled) {
+    const updates = {
+      protectionEnabled: protectionEnabled,
+      warningEnabled: warningEnabled
+    };
 
-    chrome.storage.local.set({ protectionEnabled: isEnabled }, () => {
-      statusDiv.textContent = isEnabled ? 'Phishing Content Removal is ON' : 'Phishing Content Removal is OFF';
-      console.log(`Protection state set to ${isEnabled}`);
+    chrome.storage.local.set(updates, () => {
+      // Sync the UI of all toggles
+      if (toggleMain) toggleMain.checked = protectionEnabled;
+      if (toggleWarning) toggleWarning.checked = warningEnabled;
 
-      if (isEnabled) {
+      if (protectionEnabled) {
+        statusDiv.textContent = 'Phishing Content Removal is ON';
+      } else if (warningEnabled) {
+        statusDiv.textContent = 'Warning & Highlight is ON';
+      } else {
+        statusDiv.textContent = 'Protection is OFF';
+      }
+
+      const isAnyEnabled = protectionEnabled || warningEnabled;
+      console.log(`State updated - Protection: ${protectionEnabled}, Warning: ${warningEnabled}`);
+
+      if (isAnyEnabled) {
         confidenceDiv.innerHTML = '<i>Starting analysis...</i>';
         // If protection is turned on, immediately analyze the current tab
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -130,10 +168,62 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       }
     });
+  }
+
+  // Handle "Remove & Hidden" toggle (Main) - Enables Removal
+  const handleProtectionChange = (event) => {
+    const isEnabled = event.target.checked;
+
+    // If protection is turned on/off, warning is forced off.
+    updateProtectionState(isEnabled, false);
   };
 
-  if (toggleMain) toggleMain.addEventListener('change', handleToggleChange);
-  if (toggleURL) toggleURL.addEventListener('change', handleToggleChange);
+  // Handle "Warning & Highlight" toggle - Enables Warning/Highlighting
+  const handleWarningChange = (event) => {
+    const isEnabled = event.target.checked;
+
+    // If warning is turned on/off, protection is forced off.
+    updateProtectionState(false, isEnabled);
+  };
+
+  // Handle "Analyse URLs" toggle (URL) - Scan Only (Independent)
+  const handleUrlScanningChange = (event) => {
+    const isEnabled = event.target.checked;
+    chrome.storage.local.set({ urlScanningEnabled: isEnabled }, () => {
+      if (isEnabled) {
+        statusDiv.textContent = 'URL Scanning is ON';
+        confidenceDiv.innerHTML = '<i>Starting analysis...</i>';
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs.length > 0) {
+            chrome.runtime.sendMessage({ action: "analyzeTab", tabId: tabs[0].id });
+          }
+        });
+      } else {
+        statusDiv.textContent = 'Protection is OFF';
+        confidenceDiv.innerHTML = '';
+        chrome.storage.local.remove('analysisResult');
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs.length > 0) {
+            chrome.action.setBadgeText({ text: '', tabId: tabs[0].id });
+          }
+        });
+      }
+    });
+  };
+
+  // Ensure event listeners are correctly assigned to separate functions
+  if (toggleMain) toggleMain.addEventListener('change', handleProtectionChange);
+  if (toggleURL) toggleURL.addEventListener('change', handleUrlScanningChange);
+  if (toggleWarning) toggleWarning.addEventListener('change', handleWarningChange);
+
+  const scanCookiesBtn = document.getElementById('scan-cookies-btn');
+  if (scanCookiesBtn) {
+    scanCookiesBtn.addEventListener('click', () => {
+      const cookieList = document.getElementById('cookie-list');
+      if (cookieList) cookieList.innerHTML = '<p>Scanning cookies... Please wait.</p>';
+      displayCookies();
+    });
+  }
 
   async function displayCookies() {
     if (!chrome.cookies) {
@@ -189,37 +279,31 @@ document.addEventListener('DOMContentLoaded', () => {
               cookieList.innerHTML = '<p>No cookies found for this domain.</p>';
               return;
             }
-            const table = document.createElement('table');
-            table.classList.add('cookie-table');
-            table.innerHTML = `
-              <tr>
-                <th>Name</th>
-                <th>Value</th>
-                <th>Domain</th>
-                <th>Description</th>
-                <th>Expires</th>
-                <th>Action</th>
-              </tr>
-            `;
-            cookies.forEach((cookie) => {
-              const row = document.createElement('tr');
-              const description = descriptions[cookie.name] || ''; // Get description or default to empty
 
-              row.innerHTML = `
-                <td>${cookie.name}</td>
-                <td class="cookie-value-container">
-                  <span class="masked-value">********</span>
-                  <span class="real-value" style="display:none;">${cookie.value}</span>
-                  <img src="images/view.png" class="toggle-visibility" width="20" height="20" style="cursor:pointer; vertical-align: middle; margin-left: 5px;">
-                </td>
-                <td>${cookie.domain}</td>
-                <td>${description}</td>
-                <td>${new Date(cookie.expirationDate * 1000).toLocaleString()}</td>
-                <td><input type="image" height="30px" width="30px" src="./images/trash.png" class="delete-cookie-btn" data-cookie-name="${cookie.name}" data-cookie-url="https://${cookie.domain}${cookie.path}"></td>
+            cookies.forEach((cookie, index) => {
+              const div = document.createElement('div');
+              div.className = 'cookie-card';
+              const description = descriptions[cookie.name] || '';
+              const expires = cookie.expirationDate ? new Date(cookie.expirationDate * 1000).toLocaleString() : 'Session';
+
+              div.innerHTML = `
+                <div class="cookie-header">Cookie ${index + 1}</div>
+                <div class="cookie-body">
+                  <div class="cookie-row"><strong>Name:</strong> ${cookie.name}</div>
+                  <div class="cookie-row cookie-value-container">
+                    <strong>Value:</strong> 
+                    <span class="masked-value">********</span>
+                    <span class="real-value" style="display:none;">${cookie.value}</span>
+                    <img src="images/view.png" class="toggle-visibility" width="20" height="20" style="cursor:pointer; vertical-align: middle; margin-left: 5px;">
+                  </div>
+                  <div class="cookie-row"><strong>Domain:</strong> ${cookie.domain}</div>
+                  <div class="cookie-row"><strong>Description:</strong> ${description}</div>
+                  <div class="cookie-row"><strong>Expires:</strong> ${expires}</div>
+                  <div class="cookie-row"><strong>Action:</strong> <input type="image" height="30px" width="30px" src="./images/trash.png" class="delete-cookie-btn" data-cookie-name="${cookie.name}" data-cookie-url="https://${cookie.domain}${cookie.path}" style="vertical-align: middle;"></div>
+                </div>
               `;
-              table.appendChild(row);
+              cookieList.appendChild(div);
             });
-            cookieList.appendChild(table);
 
             document.querySelectorAll('.toggle-visibility').forEach((img) => {
               img.addEventListener('click', (event) => {
@@ -329,8 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           if (p_count > 0) isPhishing = true;
           
-          urlDisplay = `Batch Scan (${count} URLs)`;
-          label = `${p_count} Phishing Found`;
+          urlDisplay = `Batch Scan <br>(${count} URLs)`;
+          label = `${p_count} Phishing Link Found`;
           confidenceDisplay = 'N/A';
         } else {
           total += 1;
@@ -372,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
           <td style="padding: 8px; border-bottom: 1px solid #000000;">${date.toLocaleString()}</td>
           <td style="padding: 8px; border-bottom: 1px solid #000000; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${urlDisplay}">${urlDisplay}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #000000; color: ${isPhishing ? '#d9534f' : '#5cb85c'}; font-weight: bold;">${label}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #000000; color: ${isPhishing ? '#d9534f' : '#038303'}; font-weight: bold;">${label}</td>
           <td style="padding: 8px; border-bottom: 1px solid #000000;">${confidenceDisplay}</td>
           <td style="padding: 8px; border-bottom: 1px solid #000000; text-align: center;">
             <img src="images/trash.png" class="delete-history-btn" data-index="${originalIndex}" width="20" style="cursor: pointer;" title="Delete Record">
@@ -423,7 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // If isBadIfIncrease is false (Legit/Total): Increase (>0) -> Green, Decrease (<0) -> Red
         const isGood = isBadIfIncrease ? (change <= 0) : (change >= 0);
         el.style.color = isGood ? '#5cb85c' : '#d9534f';
-        el.innerHTML = `${arrow} ${Math.abs(change).toFixed(1)}%`;
+        el.innerHTML = `${arrow} ${Math.abs(change).toFixed(1)}% Compared to Yesterday`;
     }
 
     // --- Render Charts using Chart.js ---
@@ -610,8 +694,432 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- Knowledge Base Management ---
+
+  function setKbStatus(msg, color) {
+    const el = document.getElementById('kb-status');
+    if (el) { el.textContent = msg; el.style.color = color || '#555'; }
+  }
+
+  function renderKbTable(rows) {
+    const tbody = document.getElementById('kb-tbody');
+    if (!tbody) return;
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No entries found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '';
+    rows.forEach((row, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.backgroundColor = idx % 2 === 0 ? '#fff' : '#f9f9f9';
+      tr.innerHTML = `
+        <td style="padding:7px 10px; border-bottom:1px solid #eee; color:#777;">${idx + 1}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #eee; vertical-align:top;">${row.question}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #eee; vertical-align:top; white-space:pre-wrap;">${row.output}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #eee; text-align:center;">
+          <img src="images/trash.png" width="18" class="kb-delete-btn" data-index="${idx}"
+            style="cursor:pointer; opacity:0.7;" title="Delete row">
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.kb-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const idx = parseInt(btn.dataset.index);
+        if (!confirm(`Delete entry #${idx + 1}?`)) return;
+        setKbStatus('Deleting…', '#555');
+        try {
+          const res = await fetch('http://127.0.0.1:5000/kb/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: idx }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setKbStatus(`Deleted. ${data.total} entries remain. Vector DB updated.`, '#5cb85c');
+            loadKbRows();
+          } else {
+            setKbStatus(`Error: ${data.error}`, '#d9534f');
+          }
+        } catch (e) {
+          setKbStatus('Could not reach server.', '#d9534f');
+        }
+      });
+    });
+  }
+
+  async function loadKbRows() {
+    setKbStatus('Loading…', '#555');
+    try {
+      const res = await fetch('http://127.0.0.1:5000/kb/rows');
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      renderKbTable(data.rows);
+      setKbStatus(`${data.total} entries loaded.`, '#555');
+    } catch (e) {
+      setKbStatus('Could not load knowledge base. Is the server running?', '#d9534f');
+    }
+  }
+
+  // Add entry form
+  const kbAddForm = document.getElementById('kb-add-form');
+  if (kbAddForm) {
+    kbAddForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = (document.getElementById('kb-question-input').value || '').trim();
+      const output   = (document.getElementById('kb-output-input').value   || '').trim();
+      if (!question || !output) {
+        setKbStatus('Please fill in both Question and Answer.', '#d9534f');
+        return;
+      }
+      setKbStatus('Adding entry…', '#555');
+      try {
+        const res = await fetch('http://127.0.0.1:5000/kb/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, output }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setKbStatus(`Added! ${data.total} entries total. Vector DB updated.`, '#5cb85c');
+          document.getElementById('kb-question-input').value = '';
+          document.getElementById('kb-output-input').value   = '';
+          loadKbRows();
+        } else {
+          setKbStatus(`Error: ${data.error}`, '#d9534f');
+        }
+      } catch (e) {
+        setKbStatus('Could not reach server.', '#d9534f');
+      }
+    });
+  }
+
+  // Manual rebuild button
+  const kbRebuildBtn = document.getElementById('kb-rebuild-btn');
+  if (kbRebuildBtn) {
+    kbRebuildBtn.addEventListener('click', async () => {
+      kbRebuildBtn.disabled = true;
+      setKbStatus('Rebuilding Vector DB…', '#2196F3');
+      try {
+        const res = await fetch('http://127.0.0.1:5000/kb/rebuild', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          setKbStatus(`Vector DB rebuilt with ${data.total} entries.`, '#5cb85c');
+        } else {
+          setKbStatus(`Error: ${data.error}`, '#d9534f');
+        }
+      } catch (e) {
+        setKbStatus('Could not reach server.', '#d9534f');
+      } finally {
+        kbRebuildBtn.disabled = false;
+      }
+    });
+  }
+
+  // --- Batch Scan Results Table ---
+
+  function renderBatchScanTable(scanData) {
+    const tbody = document.getElementById('batch-scan-tbody');
+    const meta  = document.getElementById('batch-scan-meta');
+    if (!tbody) return;
+
+    // Never scanned
+    if (!scanData) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No scan data yet. Scan a page to see results.</td></tr>';
+      if (meta) meta.textContent = '';
+      return;
+    }
+
+    const ts = scanData.timestamp ? new Date(scanData.timestamp * 1000).toLocaleString() : '';
+
+    // Scanned but page had no outgoing HTTP links
+    if (!scanData.results || scanData.results.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No HTTP links found on this page.</td></tr>';
+      if (meta) meta.textContent = `Last scanned: ${ts} — 0 URLs found`;
+      return;
+    }
+
+    if (meta) meta.textContent = `Last scanned: ${ts} — ${scanData.results.length} URL(s) found`;
+
+    tbody.innerHTML = '';
+    scanData.results.forEach((item, idx) => {
+      const isPhishing = item.label === 'PHISHING';
+      const row = document.createElement('tr');
+      row.style.backgroundColor = isPhishing ? 'rgba(217,83,79,0.12)' : 'rgba(92,184,92,0.10)';
+      row.innerHTML = `
+        <td style="padding:7px 10px; border-bottom:1px solid #ddd; color:#555;">${idx + 1}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #ddd; max-width:300px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.url}">${item.url}</span>
+            <img src="images/copy.png" width="14" height="14" class="copy-url-btn" data-url="${item.url}"
+              style="cursor:pointer; flex-shrink:0; opacity:0.6;" title="Copy URL">
+          </div>
+        </td>
+        <td style="padding:7px 10px; border-bottom:1px solid #ddd; text-align:center; font-weight:bold; color:${isPhishing ? '#d9534f' : '#038303'};">${item.label}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #ddd; text-align:center;">${item.confidence !== null ? item.confidence + '%' : '—'}</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Attach copy handlers
+    tbody.querySelectorAll('.copy-url-btn').forEach(img => {
+      img.addEventListener('click', () => {
+        navigator.clipboard.writeText(img.dataset.url).then(() => {
+          const orig = img.src;
+          img.style.opacity = '1';
+          setTimeout(() => { img.style.opacity = '0.6'; }, 1000);
+        });
+      });
+    });
+  }
+
+  function loadBatchScanResults() {
+    chrome.storage.local.get(['latestBatchScan'], (data) => {
+      renderBatchScanTable(data.latestBatchScan || null);
+    });
+  }
+
+  // "Refresh" button — manually reloads latestBatchScan from storage
+  const refreshScanBtn = document.getElementById('refresh-scan-btn');
+  if (refreshScanBtn) {
+    refreshScanBtn.addEventListener('click', loadBatchScanResults);
+  }
+
+  // "Scan Current Page" button — calls /scan_page on the backend directly
+  const scanPageBtn = document.getElementById('scan-page-btn');
+  if (scanPageBtn) {
+    scanPageBtn.addEventListener('click', () => {
+      scanPageBtn.disabled = true;
+      scanPageBtn.textContent = 'Scanning…';
+      const meta = document.getElementById('batch-scan-meta');
+      if (meta) meta.textContent = 'Fetching and analysing links…';
+
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (!tabs.length || !tabs[0].url) {
+          scanPageBtn.disabled = false;
+          scanPageBtn.textContent = 'Scan Current Page';
+          return;
+        }
+
+        const pageUrl = tabs[0].url;
+        const model   = modelSelect ? modelSelect.value : 'distilbert';
+
+        try {
+          const res = await fetch('http://127.0.0.1:5000/scan_page', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ url: pageUrl, model }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${res.status}`);
+          }
+
+          const data = await res.json();
+          const scanData = { results: data.results, timestamp: data.timestamp };
+
+          // Persist so Refresh button and future popup opens see it
+          chrome.storage.local.set({ latestBatchScan: scanData });
+          renderBatchScanTable(scanData);
+        } catch (e) {
+          if (meta) meta.textContent = `Error: ${e.message}`;
+        } finally {
+          scanPageBtn.disabled = false;
+          scanPageBtn.textContent = 'Scan Current Page';
+        }
+      });
+    });
+  }
+
+  // Live-update the table when background.js writes latestBatchScan
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.latestBatchScan) {
+      renderBatchScanTable(changes.latestBatchScan.newValue);
+    }
+    if (namespace === 'local' && changes.analysisResult) {
+      chrome.storage.local.get(['protectionEnabled', 'warningEnabled', 'urlScanningEnabled'], (data) => {
+        if (data.protectionEnabled || data.warningEnabled || data.urlScanningEnabled) {
+          updateUI(changes.analysisResult.newValue);
+        }
+      });
+    }
+  });
+
   // Load dashboard data initially if dashboard is the default view
   loadDashboardData();
+  // Pre-load batch scan data so it's ready when user switches to Analyse URL tab
+  loadBatchScanResults();
+
+  // --- Report Form & Federated Learning ---
+
+  const reportForm        = document.getElementById('report-form');
+  const reportStatus      = document.getElementById('report-status');
+  const reportModelSelect = document.getElementById('report-model-select');
+  const flReportCount     = document.getElementById('fl-report-count');
+  const flTrainBtn        = document.getElementById('fl-train-btn');
+  const flStatusDisplay   = document.getElementById('fl-status-display');
+
+  let _flPolling = null; // setInterval handle for status polling
+
+  async function fetchReportCount(modelName) {
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/report_count?model=${modelName}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (flReportCount) flReportCount.textContent = data.count;
+      }
+    } catch (e) {
+      console.error('Could not fetch report count:', e);
+    }
+  }
+
+  async function fetchFlStatus() {
+    try {
+      const res = await fetch('http://127.0.0.1:5000/fl_status');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (flStatusDisplay) {
+        flStatusDisplay.textContent = data.message || '';
+        flStatusDisplay.style.color = data.state === 'running' ? '#2196F3' : '#555';
+      }
+      if (flTrainBtn) flTrainBtn.disabled = data.state === 'running';
+
+      // Stop polling once training is idle
+      if (data.state !== 'running' && _flPolling) {
+        clearInterval(_flPolling);
+        _flPolling = null;
+        // Refresh count after training completes
+        if (reportModelSelect) fetchReportCount(reportModelSelect.value);
+      }
+    } catch (e) {
+      console.error('Could not fetch FL status:', e);
+    }
+  }
+
+  // Keep count in sync when the model selector changes
+  if (reportModelSelect) {
+    reportModelSelect.addEventListener('change', () => {
+      fetchReportCount(reportModelSelect.value);
+    });
+  }
+
+  // Handle report form submission
+  if (reportForm) {
+    reportForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const urlInput  = document.getElementById('report-url-input');
+      const typeInput = document.getElementById('report-website-type');
+      const url       = urlInput ? urlInput.value.trim() : '';
+      const model     = reportModelSelect ? reportModelSelect.value : 'distilbert';
+      const label     = typeInput ? parseInt(typeInput.value) : 0;
+
+      if (!url) {
+        if (reportStatus) { reportStatus.textContent = 'Please enter a URL.'; reportStatus.style.color = '#d9534f'; }
+        return;
+      }
+
+      if (reportStatus) { reportStatus.textContent = 'Submitting…'; reportStatus.style.color = '#555'; }
+
+      try {
+        const res = await fetch('http://127.0.0.1:5000/report', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ url, model, label }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (reportStatus) {
+            reportStatus.textContent = `Report saved! Reports for ${model}: ${data.model_reports}`;
+            reportStatus.style.color = '#5cb85c';
+          }
+          if (flReportCount) flReportCount.textContent = data.model_reports;
+          if (urlInput) urlInput.value = '';
+        } else {
+          const err = await res.json();
+          if (reportStatus) { reportStatus.textContent = `Error: ${err.error || 'Unknown error'}`; reportStatus.style.color = '#d9534f'; }
+        }
+      } catch (e) {
+        if (reportStatus) { reportStatus.textContent = 'Could not reach server. Is it running?'; reportStatus.style.color = '#d9534f'; }
+      }
+    });
+  }
+
+  // Show/hide GCP fields based on mode radio
+  const flModeLocal      = document.getElementById('fl-mode-local');
+  const flModeGcp        = document.getElementById('fl-mode-gcp');
+  const gcpUrlSection    = document.getElementById('gcp-url-section');
+  const gcpUrlInput      = document.getElementById('gcp-url-input');
+  const gcpApiKeyInput   = document.getElementById('gcp-api-key-input');
+
+  function updateModeSection() {
+    const isGcp = flModeGcp && flModeGcp.checked;
+    if (gcpUrlSection) gcpUrlSection.style.display = isGcp ? 'block' : 'none';
+  }
+  if (flModeLocal) flModeLocal.addEventListener('change', updateModeSection);
+  if (flModeGcp)   flModeGcp.addEventListener('change',   updateModeSection);
+
+  // Persist GCP URL in storage
+  if (gcpUrlInput) {
+    chrome.storage.local.get(['gcpServerUrl'], (d) => { if (d.gcpServerUrl) gcpUrlInput.value = d.gcpServerUrl; });
+    gcpUrlInput.addEventListener('change', () =>
+      chrome.storage.local.set({ gcpServerUrl: gcpUrlInput.value.trim() })
+    );
+  }
+
+  // Handle "Train Model Now" button
+  if (flTrainBtn) {
+    flTrainBtn.addEventListener('click', async () => {
+      const model  = reportModelSelect ? reportModelSelect.value : 'distilbert';
+      const mode   = flModeGcp && flModeGcp.checked ? 'gcp' : 'local';
+      const gcpUrl = gcpUrlInput ? gcpUrlInput.value.trim() : '';
+      const apiKey = gcpApiKeyInput ? gcpApiKeyInput.value.trim() : '';
+
+      if (mode === 'gcp' && !gcpUrl) {
+        if (flStatusDisplay) { flStatusDisplay.textContent = 'Please enter the GCP Server URL.'; flStatusDisplay.style.color = '#d9534f'; }
+        return;
+      }
+
+      flTrainBtn.disabled = true;
+      if (flStatusDisplay) {
+        flStatusDisplay.textContent = mode === 'gcp'
+          ? `Connecting to GCP server…`
+          : 'Starting local training…';
+        flStatusDisplay.style.color = '#2196F3';
+      }
+
+      try {
+        const body = { model, rounds: 3, mode };
+        if (mode === 'gcp') { body.gcp_url = gcpUrl; body.api_key = apiKey; }
+
+        const res = await fetch('http://127.0.0.1:5000/fl_train', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          if (flStatusDisplay) {
+            flStatusDisplay.textContent = mode === 'gcp'
+              ? `GCP FL started — uploading adapter, waiting for aggregation…`
+              : `Local training started (${data.rounds} rounds)…`;
+            flStatusDisplay.style.color = '#2196F3';
+          }
+          if (_flPolling) clearInterval(_flPolling);
+          _flPolling = setInterval(fetchFlStatus, 3000);
+        } else {
+          flTrainBtn.disabled = false;
+          if (flStatusDisplay) { flStatusDisplay.textContent = data.message || data.error || 'Error starting training.'; flStatusDisplay.style.color = '#d9534f'; }
+        }
+      } catch (e) {
+        flTrainBtn.disabled = false;
+        if (flStatusDisplay) { flStatusDisplay.textContent = 'Could not reach local server.'; flStatusDisplay.style.color = '#d9534f'; }
+      }
+    });
+  }
 });
 
 
