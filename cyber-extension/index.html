@@ -2,7 +2,7 @@
       body{
         font-family: "Courier New", Courier, monospace;
         font-size:18px;
-        min-width:750px;
+        min-width:800px;
         min-height: 750px;
         padding-top: 50px;
         margin: 0px;
@@ -150,17 +150,26 @@
       .chatInput{
         border-radius: 100px;
       }
-      .cookie-table {
-        width: 100%;
-        border-collapse: collapse;
+      .cookie-card {
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
       }
-      .cookie-table th, .cookie-table td {
-        border: 1px solid black;
-        padding: 5px;
+      .cookie-header {
+        background-color: #84dcf7;
+        padding: 10px;
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+      }
+      .cookie-body {
+        padding: 10px;
+      }
+      .cookie-row {
+        margin-bottom: 5px;
         word-break: break-all;
-        align-items: center;
-        text-align: center;
-        width:200px;
       }
       .content-section {
         margin-left: 80px;
@@ -261,12 +270,13 @@
     <div id="container">
       <div id="sidebar">
         <ul>
-          <li id="dashboard-link"><a href="#"><img src="images/dashboard.png" width="30">Dashboard</a></li>
-          <li id="analyse-url-link"><a href="#"><img src="images/Analyse URL.png" width="30"> Analyse URL</a></li>
-          <li id="website-auditing-link"><a href="#"><img src="images/Chatbot for website auditing.png" width="30">AI Powered Website Auditing</a></li>
-          <li id="malicious-content-analyser-link"><a href="#"><img src="images/mobile-app_1765888.png" width="30"> Malicious Website Content Analyser</a></li>
-          <li id="cookies-analyzer-link"><a href="#"><img src="images/analyse cookies.png" width="30"> Cookies Analyzer</a></li>
-          <li id="report-phishing-link"><a href="#"><img src="images/report issues.png" width="30">Report Phishing Website</a></li>
+          <li id="dashboard-link" style="padding-top: 20px;"><a href="#"><img src="images/dashboard.png" width="30">Dashboard</a></li>
+          <li id="analyse-url-link"><a href="#"><img src="images/Analyse URL.png" width="30"> Analyse <br> URL</a></li>
+          <li id="website-auditing-link"><a href="#"><img src="images/Chatbot for website auditing.png" width="30">AI Powered <br> Website <br>Auditing</a></li>
+          <li id="knowledge-base-management-link"><a href="#"><img src="images/Knowledge Base.png" width="30">Knowledge <br> Base<br> Management</a></li>
+          <li id="malicious-content-analyser-link"><a href="#"><img src="images/mobile-app_1765888.png" width="30">Website <br> Content <br> Analyser</a></li>
+          <li id="cookies-analyzer-link"><a href="#"><img src="images/analyse cookies.png" width="30"> Cookies <br> Analyzer</a></li>
+          <li id="report-phishing-link"><a href="#"><img src="images/report issues.png" width="30">Report <br> Phishing <br>Website</a></li>
         </ul>
       </div>
 
@@ -281,12 +291,12 @@
                 <p id="total-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
             </div>
             <div class="metric-card" style="background: #84dcf7; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h3>Phishing</h3>
+                <h3>Phishing Link Founded</h3>
                 <p id="phishing-detected" style="font-size: 24px; font-weight: bold; color: #d9534f;">0</p>
                 <p id="phishing-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
             </div>
             <div class="metric-card" style="background: #84dcf7; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h3>Legitimate</h3>
+                <h3>Legitimate Link Founded</h3>
                 <p id="legitimate-sites" style="font-size: 24px; font-weight: bold; color: #5cb85c;">0</p>
                 <p id="legit-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
             </div>
@@ -343,6 +353,13 @@
 
       <div id="analyse-url-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
         <h2>Phishing URL Analyser</h2>
+        <div style="margin-bottom: 20px;">
+          <label for="model-select"><strong>Detection Model:</strong></label>
+          <select id="model-select" style="margin-left: 10px; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer;">
+            <option value="distilbert">DistilBERT</option>
+            <option value="mobilebert">MobileBERT</option>
+          </select>
+        </div>
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
           <label class="switch">
             <input type="checkbox" id="protectionToggleURL">
@@ -356,20 +373,120 @@
           <br>
           <div id="confidence"></div>
         </div>
-      </div>
 
-      <div id="website-auditing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
-        <h3>Chat with AI Assistant for Website Auditing</h3>
-        <div id="chatLog" class="chat-log"></div>
-        <div class="chat-input-area">
-          <input style="padding-top: 5px; padding-bottom: 5px;" type="text" id="chatInput" placeholder="     Ask Starcoder 2..." class="chatInput">
-          <button id="sendMessage">Send Message</button>
-          <button id="clearChat">Clear Chat</button>
+        <div style="margin-top: 24px; display: flex; align-items: center; justify-content: space-between;">
+          <h3 style="margin: 0;">Batch Scan Results</h3>
+          <div style="display: flex; gap: 8px;">
+            <button id="refresh-scan-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Refresh</button>
+            <button id="scan-page-btn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Scan Current Page</button>
+          </div>
+        </div>
+        <p id="batch-scan-meta" style="font-size: 13px; color: #666; margin: 6px 0 10px 0;"></p>
+        <div style="overflow-x: auto; max-height: 350px; border: 1px solid #ccc; border-radius: 6px;">
+          <table id="batch-scan-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #c7cef7; position: sticky; top: 0;">
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;">#</th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;">URL</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa;">Label</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa;">Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="batch-scan-tbody">
+              <tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No scan data yet. Scan a page to see results.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div id="cookie-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+      <div id="knowledge-base-management-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <h2 style="margin: 0;">Knowledge Base Management</h2>
+          <button id="kb-rebuild-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">↻ Rebuild Vector DB</button>
+        </div>
+        <p style="font-size: 14px; color: #555; margin: 0 0 14px 0;">Add or remove Q&amp;A entries. Every change automatically updates the chatbot's knowledge base.</p>
+        <div id="kb-status" style="font-size: 14px; font-style: italic; color: #555; margin-bottom: 10px; min-height: 18px;"></div>
+
+        <!-- Table -->
+        <div style="overflow-x: auto; max-height: 340px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 20px;">
+          <table id="kb-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #c7cef7; position: sticky; top: 0;">
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa; width: 36px;">#</th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa; width: 40%;">Question</th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;">Answer</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa; width: 60px;">Delete</th>
+              </tr>
+            </thead>
+            <tbody id="kb-tbody">
+              <tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Add Row Form -->
+        <h3 style="margin: 0 0 10px 0;">Add New Entry</h3>
+        <form id="kb-add-form">
+          <div style="margin-bottom: 10px;">
+            <label style="font-weight: bold; font-size: 14px;">Question:</label><br>
+            <input type="text" id="kb-question-input" placeholder="Enter question…"
+              style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px;">
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-weight: bold; font-size: 14px;">Answer:</label><br>
+            <textarea id="kb-output-input" rows="4" placeholder="Enter answer…"
+              style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+          </div>
+          <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 9px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">+ Add Entry</button>
+        </form>
+      </div>
+
+      <div id="website-auditing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h3 style="margin-bottom: 10px;">Chat with AI Assistant for Website Auditing</h3>
+
+        <!-- Model selector -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+          <label style="font-weight: bold; font-size: 14px; white-space: nowrap;">AI Model:</label>
+          <select id="chat-model-select" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; font-family: inherit; cursor: pointer;">
+            <option value="starcoder2">StarCoder2 (Local)</option>
+            <option value="claude">Claude API (Anthropic)</option>
+          </select>
+        </div>
+
+        <!-- Topic restriction toggle -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <label class="switch" style="flex-shrink: 0;">
+            <input type="checkbox" id="audit-only-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+          <span style="font-size: 14px;">Restrict to Website Auditing topics only</span>
+        </div>
+
+        <!-- Claude API key row (hidden unless Claude is selected) -->
+        <div id="claude-key-row" style="display: none; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+          <label style="font-weight: bold; font-size: 13px; white-space: nowrap;">API Key:</label>
+          <input type="password" id="claude-api-key-input" placeholder="sk-ant-..." autocomplete="off"
+            style="flex: 1; min-width: 180px; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-family: inherit;">
+          <button id="claude-key-save-btn" style="background-color: #4CAF50; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Save</button>
+          <button id="claude-key-clear-btn" style="background-color: #d9534f; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Clear</button>
+          <span id="claude-key-status" style="font-size: 12px; color: #555;"></span>
+        </div>
+
+        <div id="chatLog" class="chat-log"></div>
+        <div class="chat-input-area">
+          <input style="padding-top: 5px; padding-bottom: 5px;" type="text" id="chatInput" placeholder="     Ask StarCoder2..." class="chatInput">
+          <button id="sendMessage">Send Message</button>
+          <button id="clearChat">Clear Chat</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+          <input type="checkbox" id="attach-html-cb" style="width: 16px; height: 16px; cursor: pointer;">
+          <label for="attach-html-cb" style="font-size: 13px; color: #555; cursor: pointer;">Attach current page HTML for auditing</label>
+        </div>
+      </div>
+
+      <div id="cookie-content" class="content-section" style="display: none; padding: 16px;padding-top: 0px; flex-grow: 1;">
         <h2>Cookies Analyzer</h2>
+        <button id="scan-cookies-btn" style="background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px;">Scan Cookies</button>
         <p>Retrieved Cookies for Current Website:</p><div></div>
         <div id="cookie-list"></div>
       </div>
@@ -379,10 +496,13 @@
         <h2>Malicious Website Content Analyser</h2>
         <p>Malicious content analysis functionality will be here.</p>
         <form>
-          
-          <input type="checkbox" id="warning"name="warning" value="warning">
-          <label for="warning">Warning and Highlight Malicious Content</label><br>
-
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <label class="switch">
+              <input type="checkbox" id="warningToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Warning and Highlight Malicious Content</span>
+          </div>
 
           <div style="display: flex; align-items: center; margin-top: 10px;">
             <label class="switch">
@@ -391,27 +511,84 @@
             </label>
             <span style="margin-left: 10px;">Remove & Hidden Malicious Content</span>
           </div>
+
+          <div style="display: flex; align-items: center; margin-top: 10px;">
+            <label class="switch">
+              <input type="checkbox" id="blockingPopupToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Block Page with Phishing Warning Popup</span>
+          </div>
+          <p style="font-size: 13px; color: #666; margin: 6px 0 0 28px;">
+            Shows a full-page warning before entering websites detected as phishing (&gt;85% = Phishing, 50–84% = Suspicious).
+          </p>
         </form>
 
       </div>
 
       <div id="report-phishing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
-        <h2>Report Phishing Website</h2>
-        <br><br>
-        <form id="report-url" action="" method="post">
-        <h2>Enter the URLs</h2>  
-        <input type="text" id="report-url" placeholder="Enter URL to report">
-        <br><br>
-        <label for="report_website">Select the Type of the Website:</label>
-        <br>
-        <select name="report_website",id="report_website">
-          <option value="phishing">Phishing Website</option>
-          <option value="legitimate">Legitimate Website</option>
-        </select>
-        <br>
-        <button style="margin-top: 50px;"class="submit-error" type="submit">Submit</button>
+        <h2>Report Model Error</h2>
+        <p style="color:#555; font-size:15px;">Help improve detection accuracy by reporting incorrect predictions. Submitted reports are used for Federated Learning (Flower + PEFT LoRA) to fine-tune the selected model.</p>
+
+        <form id="report-form">
+          <div style="margin-bottom: 15px;">
+            <label for="report-model-select"><strong>Detection Model:</strong></label><br>
+            <select id="report-model-select" style="margin-top:6px; padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer;">
+              <option value="distilbert">DistilBERT</option>
+              <option value="mobilebert">MobileBERT</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <label for="report-url-input"><strong>URL:</strong></label><br>
+            <input type="text" id="report-url-input" placeholder="Enter URL to report" style="margin-top:6px; width: 85%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 15px;">
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label for="report-website-type"><strong>True Type of Website:</strong></label><br>
+            <select id="report-website-type" style="margin-top:6px; padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer;">
+              <option value="0">Legitimate Website</option>
+              <option value="1">Phishing Website</option>
+            </select>
+          </div>
+
+          <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Submit Report</button>
         </form>
 
+        <div id="report-status" style="margin-top: 14px; font-style: italic; color: #333;"></div>
+
+        <hr style="margin: 28px 0; border: none; border-top: 1px solid #bbb;">
+
+        <h3>Federated Learning Training</h3>
+        <p style="font-size:15px;">Reports for selected model: <strong id="fl-report-count">0</strong></p>
+
+        <div style="margin-bottom: 14px;">
+          <label><strong>Training Mode:</strong></label><br>
+          <label style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="fl-mode" id="fl-mode-local" value="local" checked> Local (runs on this machine)
+          </label><br>
+          <label style="margin-top:4px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="fl-mode" id="fl-mode-gcp" value="gcp"> GCP Cloud (centralised server)
+          </label>
+        </div>
+
+        <div id="gcp-url-section" style="display:none; margin-bottom: 14px;">
+          <div style="margin-bottom: 10px;">
+            <label for="gcp-url-input"><strong>GCP Server URL:</strong></label><br>
+            <input type="text" id="gcp-url-input" placeholder="https://fl-server-xxxx-uc.a.run.app"
+              style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+            <p style="font-size:13px; color:#888; margin:4px 0 0 0;">Cloud Run service URL from GCP console.</p>
+          </div>
+          <div>
+            <label for="gcp-api-key-input"><strong>API Key:</strong> <span style="font-weight:normal; color:#666;">(optional)</span></label><br>
+            <input type="password" id="gcp-api-key-input" placeholder="Leave blank if not set"
+              style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+          </div>
+        </div>
+
+        <p style="font-size:14px; color:#666;">Minimum 2 reports required. Training runs LoRA fine-tuning (3 FL rounds). The updated model is saved and used immediately.</p>
+        <button id="fl-train-btn" style="background-color: #2196F3; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Train Model Now</button>
+        <div id="fl-status-display" style="margin-top: 12px; font-style: italic; color: #555;"></div>
       </div>
 
     </div>
