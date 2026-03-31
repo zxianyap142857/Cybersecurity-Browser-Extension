@@ -126,15 +126,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
-  // Function to update state and UI
+  // Function to update state and UI — toggles only set the action mode, no auto scan
   function updateProtectionState(protectionEnabled, warningEnabled) {
-    const updates = {
-      protectionEnabled: protectionEnabled,
-      warningEnabled: warningEnabled
-    };
-
-    chrome.storage.local.set(updates, () => {
-      // Sync the UI of all toggles
+    chrome.storage.local.set({ protectionEnabled, warningEnabled }, () => {
       if (toggleMain) toggleMain.checked = protectionEnabled;
       if (toggleWarning) toggleWarning.checked = warningEnabled;
 
@@ -145,28 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         statusDiv.textContent = 'Protection is OFF';
       }
-
-      const isAnyEnabled = protectionEnabled || warningEnabled;
       console.log(`State updated - Protection: ${protectionEnabled}, Warning: ${warningEnabled}`);
-
-      if (isAnyEnabled) {
-        confidenceDiv.innerHTML = '<i>Starting analysis...</i>';
-        // If protection is turned on, immediately analyze the current tab
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs.length > 0) {
-            chrome.runtime.sendMessage({ action: "analyzeTab", tabId: tabs[0].id });
-          }
-        });
-      } else {
-        // If turned off, clear the analysis result and any badge text
-        updateUI(null);
-        chrome.storage.local.remove('analysisResult');
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs.length > 0) {
-            chrome.action.setBadgeText({ text: '', tabId: tabs[0].id });
-          }
-        });
-      }
     });
   }
 
@@ -186,16 +159,45 @@ document.addEventListener('DOMContentLoaded', () => {
     updateProtectionState(false, isEnabled);
   };
 
-  // Handle "Analyse URLs" toggle (URL) - Scan Only (Independent)
+  // Handle "Analyse URLs" toggle (URL) - Scan current page URL only via /predict
   const handleUrlScanningChange = (event) => {
     const isEnabled = event.target.checked;
     chrome.storage.local.set({ urlScanningEnabled: isEnabled }, () => {
       if (isEnabled) {
         statusDiv.textContent = 'URL Scanning is ON';
-        confidenceDiv.innerHTML = '<i>Starting analysis...</i>';
+        confidenceDiv.innerHTML = '<i>Analysing current URL...</i>';
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          if (tabs.length > 0) {
-            chrome.runtime.sendMessage({ action: "analyzeTab", tabId: tabs[0].id });
+          if (tabs.length > 0 && tabs[0].url) {
+            const pageUrl = tabs[0].url;
+            const tabId   = tabs[0].id;
+            const model   = modelSelect ? modelSelect.value : 'distilbert';
+
+            // Call /predict directly from popup (avoids message-passing issues)
+            fetch('http://127.0.0.1:5000/predict', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: pageUrl, model }),
+            })
+              .then(r => r.json())
+              .then(data => {
+                const isPhishing = data.prediction && data.prediction.includes('PHISHING');
+                const confNum = parseFloat(data.confidence) || 0;
+
+                if (isPhishing) {
+                  chrome.storage.local.set({ analysisResult: { status: 'PHISHING', confidence: confNum / 100 } });
+                  chrome.action.setBadgeText({ text: '!', tabId });
+                  chrome.action.setBadgeBackgroundColor({ color: '#d9534f', tabId });
+                } else {
+                  chrome.storage.local.set({ analysisResult: { status: 'LEGITIMATE' } });
+                  chrome.action.setBadgeText({ text: '\u2713', tabId });
+                  chrome.action.setBadgeBackgroundColor({ color: '#008000', tabId });
+                }
+                // updateUI will fire via storage.onChanged listener
+              })
+              .catch(err => {
+                console.error('URL scan error:', err);
+                confidenceDiv.innerHTML = `<span style="color:red;">Error: ${err.message}</span>`;
+              });
           }
         });
       } else {
@@ -215,6 +217,48 @@ document.addEventListener('DOMContentLoaded', () => {
   if (toggleMain) toggleMain.addEventListener('change', handleProtectionChange);
   if (toggleURL) toggleURL.addEventListener('change', handleUrlScanningChange);
   if (toggleWarning) toggleWarning.addEventListener('change', handleWarningChange);
+
+  // --- Batch Predict Button ---
+  const batchScanActionBtn = document.getElementById('batchScanActionBtn');
+  const batchScanActionStatus = document.getElementById('batchScanActionStatus');
+  if (batchScanActionBtn) {
+    batchScanActionBtn.addEventListener('click', () => {
+      chrome.storage.local.get(['protectionEnabled', 'warningEnabled'], (data) => {
+        if (!data.protectionEnabled && !data.warningEnabled) {
+          if (batchScanActionStatus) batchScanActionStatus.textContent = 'Please enable Warning or Protection toggle first.';
+          return;
+        }
+
+        batchScanActionBtn.disabled = true;
+        batchScanActionBtn.textContent = 'Scanning...';
+        if (batchScanActionStatus) batchScanActionStatus.textContent = 'Running batch prediction on all page links...';
+
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs.length > 0) {
+            chrome.runtime.sendMessage({ action: "analyzeTab", tabId: tabs[0].id }, () => {
+              batchScanActionBtn.disabled = false;
+              batchScanActionBtn.textContent = 'Batch Predict Page URLs';
+              if (batchScanActionStatus) batchScanActionStatus.textContent = 'Batch scan triggered. Results will appear shortly.';
+            });
+          } else {
+            batchScanActionBtn.disabled = false;
+            batchScanActionBtn.textContent = 'Batch Predict Page URLs';
+          }
+        });
+      });
+    });
+  }
+
+  // --- Blocking Popup Toggle ---
+  const blockingPopupToggle = document.getElementById('blockingPopupToggle');
+  if (blockingPopupToggle) {
+    chrome.storage.local.get(['blockingPopupEnabled'], (data) => {
+      blockingPopupToggle.checked = !!data.blockingPopupEnabled;
+    });
+    blockingPopupToggle.addEventListener('change', () => {
+      chrome.storage.local.set({ blockingPopupEnabled: blockingPopupToggle.checked });
+    });
+  }
 
   const scanCookiesBtn = document.getElementById('scan-cookies-btn');
   if (scanCookiesBtn) {
@@ -886,19 +930,19 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshScanBtn.addEventListener('click', loadBatchScanResults);
   }
 
-  // "Scan Current Page" button — calls /scan_page on the backend directly
-  const scanPageBtn = document.getElementById('scan-page-btn');
-  if (scanPageBtn) {
-    scanPageBtn.addEventListener('click', () => {
-      scanPageBtn.disabled = true;
-      scanPageBtn.textContent = 'Scanning…';
+  // "Scan Page URLs" button — batch-scans all links on the page via /scan_page
+  const batchScanPageBtn = document.getElementById('batch-scan-page-btn');
+  if (batchScanPageBtn) {
+    batchScanPageBtn.addEventListener('click', () => {
+      batchScanPageBtn.disabled = true;
+      batchScanPageBtn.textContent = 'Scanning…';
       const meta = document.getElementById('batch-scan-meta');
-      if (meta) meta.textContent = 'Fetching and analysing links…';
+      if (meta) meta.textContent = 'Fetching and analysing all page links…';
 
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         if (!tabs.length || !tabs[0].url) {
-          scanPageBtn.disabled = false;
-          scanPageBtn.textContent = 'Scan Current Page';
+          batchScanPageBtn.disabled = false;
+          batchScanPageBtn.textContent = 'Scan Page URLs';
           return;
         }
 
@@ -920,14 +964,69 @@ document.addEventListener('DOMContentLoaded', () => {
           const data = await res.json();
           const scanData = { results: data.results, timestamp: data.timestamp };
 
-          // Persist so Refresh button and future popup opens see it
+          chrome.storage.local.set({ latestBatchScan: scanData });
+          renderBatchScanTable(scanData);
+        } catch (e) {
+          if (meta) meta.textContent = `Error: ${e.message}`;
+        } finally {
+          batchScanPageBtn.disabled = false;
+          batchScanPageBtn.textContent = 'Scan Page URLs';
+        }
+      });
+    });
+  }
+
+  // "Scan Current URL" button — scans only the current page URL via /predict
+  const scanPageBtn = document.getElementById('scan-page-btn');
+  if (scanPageBtn) {
+    scanPageBtn.addEventListener('click', () => {
+      scanPageBtn.disabled = true;
+      scanPageBtn.textContent = 'Scanning…';
+      const meta = document.getElementById('batch-scan-meta');
+      if (meta) meta.textContent = 'Analysing current page URL…';
+
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+        if (!tabs.length || !tabs[0].url) {
+          scanPageBtn.disabled = false;
+          scanPageBtn.textContent = 'Scan Current URL';
+          return;
+        }
+
+        const pageUrl = tabs[0].url;
+        const model   = modelSelect ? modelSelect.value : 'distilbert';
+
+        try {
+          const res = await fetch('http://127.0.0.1:5000/predict', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ url: pageUrl, model }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${res.status}`);
+          }
+
+          const data = await res.json();
+          // data = { url, prediction: "PHISHING / MALICIOUS" | "LEGITIMATE / SAFE", confidence: "92.35%", model }
+          const confNum = parseFloat(data.confidence) || 0;
+          const label = data.prediction.includes('PHISHING') ? 'PHISHING' : 'LEGITIMATE';
+          const scanData = {
+            results: [{
+              url: data.url,
+              label: label,
+              confidence: confNum.toFixed(2),
+            }],
+            timestamp: Date.now() / 1000,
+          };
+
           chrome.storage.local.set({ latestBatchScan: scanData });
           renderBatchScanTable(scanData);
         } catch (e) {
           if (meta) meta.textContent = `Error: ${e.message}`;
         } finally {
           scanPageBtn.disabled = false;
-          scanPageBtn.textContent = 'Scan Current Page';
+          scanPageBtn.textContent = 'Scan Current URL';
         }
       });
     });
@@ -1132,79 +1231,247 @@ const chatLog = document.getElementById('chatLog');
 const chatInput = document.getElementById('chatInput');
 const sendMessageBtn = document.getElementById('sendMessage');
 const clearChatBtn = document.getElementById('clearChat');
+const chatModelSelect = document.getElementById('chat-model-select');
+const claudeKeyRow = document.getElementById('claude-key-row');
+const claudeApiKeyInput = document.getElementById('claude-api-key-input');
+const claudeKeySaveBtn = document.getElementById('claude-key-save-btn');
+const claudeKeyStatus = document.getElementById('claude-key-status');
 
-// Function to add a message to the chat log UI
+const CLAUDE_SYSTEM_PROMPT_GENERAL =
+  'You are a cybersecurity expert assistant embedded in a Chrome extension. ' +
+  'Help the user audit websites for phishing, malicious content, suspicious cookies, ' +
+  'unsafe scripts, and security best practices. Be concise and practical.';
+
+const CLAUDE_SYSTEM_PROMPT_STRICT =
+  'You are a cybersecurity website-auditing assistant embedded in a Chrome extension. ' +
+  'You ONLY answer questions directly related to website auditing, including: ' +
+  'phishing detection, malicious URL analysis, cookie security, SSL/TLS inspection, ' +
+  'Content Security Policy (CSP), HTTP header analysis, XSS/CSRF/SQL injection risks, ' +
+  'suspicious scripts/iframes, domain reputation, WHOIS lookups, and security best practices for websites.\n\n' +
+  'If the user asks about anything NOT related to website auditing or web security, ' +
+  'politely decline and remind them that you are specialised for website auditing only. ' +
+  'For example: "I\'m specialised in website auditing and web security. Could you rephrase your question in that context?"\n\n' +
+  'Be concise, practical, and always ground your answers in security evidence.';
+
+const auditOnlyToggle = document.getElementById('audit-only-toggle');
+
+// Persist toggle state
+chrome.storage.local.get(['auditOnlyMode'], (data) => {
+  const enabled = data.auditOnlyMode !== false;  // default ON
+  auditOnlyToggle.checked = enabled;
+});
+auditOnlyToggle.addEventListener('change', () => {
+  chrome.storage.local.set({ auditOnlyMode: auditOnlyToggle.checked });
+});
+
+function getActiveSystemPrompt() {
+  return auditOnlyToggle.checked ? CLAUDE_SYSTEM_PROMPT_STRICT : CLAUDE_SYSTEM_PROMPT_GENERAL;
+}
+
+// ---- Chat persistence helpers ----
+function chatStorageKey() {
+  return 'chatHistory_' + chatModelSelect.value;
+}
+
+function saveChatHistory() {
+  chrome.storage.local.set({ [chatStorageKey()]: chatHistory });
+}
+
+function loadChatFromStorage() {
+  chatLog.innerHTML = '';
+  chrome.storage.local.get([chatStorageKey()], (data) => {
+    chatHistory = data[chatStorageKey()] || [];
+    chatHistory.forEach((msg) => {
+      addMessageToLog(msg.role === 'user' ? 'user' : 'bot', msg.content);
+    });
+  });
+}
+
+// Load persisted model selection and API key
+chrome.storage.local.get(['chatModel', 'claudeApiKey'], (data) => {
+  const model = data.chatModel || 'starcoder2';
+  chatModelSelect.value = model;
+  applyChatModelUI(model);
+  if (data.claudeApiKey) {
+    claudeApiKeyInput.value = data.claudeApiKey;
+    claudeKeyStatus.textContent = 'Key saved.';
+  }
+  // Load chat history for the active model
+  loadChatFromStorage();
+});
+
+function applyChatModelUI(model) {
+  if (model === 'claude') {
+    claudeKeyRow.style.display = 'flex';
+    chatInput.placeholder = '     Ask Claude...';
+  } else {
+    claudeKeyRow.style.display = 'none';
+    chatInput.placeholder = '     Ask StarCoder2...';
+  }
+}
+
+chatModelSelect.addEventListener('change', () => {
+  const model = chatModelSelect.value;
+  chrome.storage.local.set({ chatModel: model });
+  applyChatModelUI(model);
+  loadChatFromStorage();   // load that model's saved history
+});
+
+claudeKeySaveBtn.addEventListener('click', () => {
+  const key = claudeApiKeyInput.value.trim();
+  if (!key) { claudeKeyStatus.textContent = 'Enter a key first.'; return; }
+  chrome.storage.local.set({ claudeApiKey: key }, () => {
+    claudeKeyStatus.textContent = 'Saved!';
+    setTimeout(() => { claudeKeyStatus.textContent = 'Key saved.'; }, 2000);
+  });
+});
+
+const claudeKeyClearBtn = document.getElementById('claude-key-clear-btn');
+claudeKeyClearBtn.addEventListener('click', () => {
+  chrome.storage.local.remove('claudeApiKey', () => {
+    claudeApiKeyInput.value = '';
+    claudeKeyStatus.textContent = 'Key cleared.';
+    setTimeout(() => { claudeKeyStatus.textContent = ''; }, 2000);
+  });
+});
+
+// Add a message bubble to the chat log
 function addMessageToLog(role, content) {
   const messageWrapper = document.createElement('div');
   messageWrapper.classList.add(role === 'user' ? 'user-message' : 'bot-message');
-
   const messageContent = document.createElement('div');
   messageContent.classList.add('message-content');
   messageContent.textContent = content;
-
   messageWrapper.appendChild(messageContent);
   chatLog.appendChild(messageWrapper);
-  chatLog.scrollTop = chatLog.scrollHeight; // Auto-scroll to the latest message
+  chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-// Function to handle sending a message
+// StarCoder2 via local Flask
+async function sendToStarcoder(userInput) {
+  const response = await fetch('http://127.0.0.1:5000/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: userInput, history: chatHistory, audit_only: auditOnlyToggle.checked }),
+  });
+  if (!response.ok) throw new Error(`Server error ${response.status}`);
+  const data = await response.json();
+  return data.answer || 'Sorry, I encountered an error.';
+}
+
+// Claude via Anthropic API (direct browser call)
+async function sendToClaude(userInput) {
+  const apiKey = claudeApiKeyInput.value.trim();
+  if (!apiKey) throw new Error('No Claude API key set. Enter your key and click Save.');
+
+  // Build messages array (Claude format — same as chatHistory)
+  const messages = [
+    ...chatHistory,
+    { role: 'user', content: userInput },
+  ];
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: getActiveSystemPrompt(),
+      messages,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.text || 'No response from Claude.';
+}
+
+// --- Helper: extract current tab's HTML via chrome.scripting ---
+const attachHtmlCb = document.getElementById('attach-html-cb');
+
+async function getPageHtml() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !tab.id) return null;
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => document.documentElement.outerHTML,
+    });
+    return results?.[0]?.result || null;
+  } catch {
+    return null;
+  }
+}
+
+function truncateHtml(html, maxChars = 12000) {
+  if (html.length <= maxChars) return html;
+  return html.slice(0, maxChars) + '\n... [HTML truncated]';
+}
+
+// Main send handler
 async function handleSendMessage() {
   const userInput = chatInput.value.trim();
   if (!userInput) return;
 
-  // 1. Display user's message immediately
   addMessageToLog('user', userInput);
-  chatInput.value = ''; // Clear input field
+  chatInput.value = '';
 
-  // 2. Send message to backend and get response
+  const model = chatModelSelect.value;
+  const thinkingEl = document.createElement('div');
+  thinkingEl.classList.add('bot-message');
+  thinkingEl.innerHTML = '<div class="message-content" style="color:#888; font-style:italic;">Thinking…</div>';
+  chatLog.appendChild(thinkingEl);
+  chatLog.scrollTop = chatLog.scrollHeight;
+
   try {
-    const response = await fetch('http://127.0.0.1:5000/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Send the user's query and the current chat history
-      body: JSON.stringify({ 
-        query: userInput,
-        history: chatHistory 
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Optionally attach page HTML
+    let queryForModel = userInput;
+    if (attachHtmlCb.checked) {
+      const html = await getPageHtml();
+      if (html) {
+        queryForModel = userInput +
+          '\n\n--- CURRENT PAGE HTML (for auditing) ---\n' +
+          truncateHtml(html) +
+          '\n--- END HTML ---';
+      }
     }
 
-    const data = await response.json();
-    const botResponse = data.answer || 'Sorry, I encountered an error.';
+    const botResponse = model === 'claude'
+      ? await sendToClaude(queryForModel)
+      : await sendToStarcoder(queryForModel);
 
-    // 3. Display bot's response
+    chatLog.removeChild(thinkingEl);
     addMessageToLog('bot', botResponse);
-
-    // 4. Update chat history for the next request
+    // Store the original user input (not the huge HTML) in history
     chatHistory.push({ role: 'user', content: userInput });
     chatHistory.push({ role: 'assistant', content: botResponse });
-
+    saveChatHistory();
   } catch (error) {
-    console.error('Error:', error);
-    addMessageToLog('bot', 'Could not get a response. Is the server running?');
+    chatLog.removeChild(thinkingEl);
+    addMessageToLog('bot', `Error: ${error.message}`);
   }
 }
 
-// Function to clear the chat
 function handleClearChat() {
   chatLog.innerHTML = '';
   chatHistory = [];
-  console.log('Chat history cleared.');
+  saveChatHistory();   // remove from storage
 }
 
-// Event Listeners
 sendMessageBtn.addEventListener('click', handleSendMessage);
 clearChatBtn.addEventListener('click', handleClearChat);
-
-// Allow sending message with Enter key
 chatInput.addEventListener('keypress', (event) => {
   if (event.key === 'Enter') {
-    event.preventDefault(); // Prevents the default action (e.g., form submission)
+    event.preventDefault();
     handleSendMessage();
   }
 });
