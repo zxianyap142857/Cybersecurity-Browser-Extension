@@ -39,6 +39,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+from google.cloud import storage as gcs
 
 # --- RAG Chatbot Setup ---
 # Set environment variables for model caching.
@@ -61,6 +62,21 @@ MODEL_PATHS = {
 REPORTED_DATA_PATH = os.path.join(_BACKEND_DIR, 'reported_data.json')
 KB_CSV_PATH = os.path.join(_EXTENSION_DIR, 'Knowledge Base', 'Knowledge Base.csv')
 
+# --- Google Cloud Storage archiving for Knowledge Base ---
+GCS_BUCKET_NAME = 'cyber-fl-models'
+GCS_KB_BLOB     = 'knowledge-base/Knowledge Base.csv'
+
+def _archive_kb_to_gcs():
+    """Upload the local KB CSV to Google Cloud Storage for backup/archiving."""
+    try:
+        client = gcs.Client()
+        bucket = client.bucket(GCS_BUCKET_NAME)
+        blob = bucket.blob(GCS_KB_BLOB)
+        blob.upload_from_filename(KB_CSV_PATH)
+        print(f"[KB] Archived to gs://{GCS_BUCKET_NAME}/{GCS_KB_BLOB}")
+    except Exception as e:
+        print(f"[KB] GCS archive failed (non-fatal): {e}")
+
 # --- Federated learning module ---
 from federated.fl_training import (
     run_federated_training,
@@ -78,10 +94,14 @@ def load_phishing_model(model_name='distilbert'):
     load_dir = MODEL_PATHS.get(model_name, MODEL_PATHS['distilbert'])
     if model_name == 'mobilebert':
         tokenizer = MobileBertTokenizer.from_pretrained(load_dir)
-        model = MobileBertForSequenceClassification.from_pretrained(load_dir)
+        model = MobileBertForSequenceClassification.from_pretrained(
+            load_dir, device_map=None, low_cpu_mem_usage=False
+        )
     else:
         tokenizer = DistilBertTokenizer.from_pretrained(load_dir)
-        model = DistilBertForSequenceClassification.from_pretrained(load_dir)
+        model = DistilBertForSequenceClassification.from_pretrained(
+            load_dir, device_map=None, low_cpu_mem_usage=False
+        )
     model.eval()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -277,9 +297,19 @@ def chat():
     data = request.get_json()
     query = data.get('query')
     history_json = data.get('history', [])
+    audit_only = data.get('audit_only', False)
 
     if not query:
         return jsonify({'error': 'Query is required'}), 400
+
+    # When audit-only mode is on, prepend an instruction to the query
+    if audit_only:
+        query = (
+            "[SYSTEM RULE: You ONLY answer questions related to website auditing and web security "
+            "(phishing, malicious URLs, cookies, SSL/TLS, CSP, HTTP headers, XSS, CSRF, SQL injection, "
+            "suspicious scripts, domain reputation, etc.). If the question is unrelated, politely decline "
+            "and say you are specialised for website auditing only.]\n\n" + query
+        )
 
     # Reconstruct chat history for LangChain
     chat_history = []
@@ -657,18 +687,40 @@ def scan_page():
     except Exception as e:
         return jsonify({'error': f'Failed to fetch page: {str(e)}'}), 502
 
-    # 2. Extract unique HTTP/HTTPS links
+    # 2. Extract unique HTTP/HTTPS links from all relevant HTML elements
     soup = BeautifulSoup(html, 'html.parser')
     seen = set()
     http_links = []
+
+    def _collect(resolved_url):
+        """Add a resolved URL to the list if it's HTTP/HTTPS and not seen before."""
+        if resolved_url.startswith(('http://', 'https://')) and resolved_url not in seen:
+            seen.add(resolved_url)
+            http_links.append(resolved_url)
+
+    # <a href="...">
     for tag in soup.find_all('a', href=True):
-        href = tag['href'].strip()
-        # Resolve relative URLs against the page URL
-        resolved = urljoin(page_url, href)
-        if resolved.startswith('http://') or resolved.startswith('https://'):
-            if resolved not in seen:
-                seen.add(resolved)
-                http_links.append(resolved)
+        _collect(urljoin(page_url, tag['href'].strip()))
+
+    # <img src="...">, <img data-src="..."> (lazy-loaded images)
+    for tag in soup.find_all('img'):
+        if tag.get('src'):
+            _collect(urljoin(page_url, tag['src'].strip()))
+        if tag.get('data-src'):
+            _collect(urljoin(page_url, tag['data-src'].strip()))
+
+    # <li>, <tr>, <div>, <h1>-<h6>, <section>, <article> — extract any nested href/src
+    # Also scan data-href and data-url attributes used by JS-driven pages
+    for tag in soup.find_all(['li', 'tr', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                               'section', 'article', 'blockquote']):
+        for attr in ['href', 'data-href', 'data-url']:
+            val = tag.get(attr)
+            if val:
+                _collect(urljoin(page_url, val.strip()))
+
+    # <iframe src="...">, <embed src="...">, <source src="...">
+    for tag in soup.find_all(['iframe', 'embed', 'source'], src=True):
+        _collect(urljoin(page_url, tag['src'].strip()))
 
     if not http_links:
         return jsonify({'results': [], 'total_scanned': 0, 'timestamp': time.time()})
@@ -767,6 +819,7 @@ def kb_add():
         df = pd.concat([df, new_row], ignore_index=True)
         df.to_csv(KB_CSV_PATH, index=False, encoding='utf-8')
         total = _rebuild_lancedb()
+        _archive_kb_to_gcs()
         return jsonify({'status': 'added', 'total': total})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -787,6 +840,7 @@ def kb_delete():
         df = df.drop(index=idx).reset_index(drop=True)
         df.to_csv(KB_CSV_PATH, index=False, encoding='utf-8')
         total = _rebuild_lancedb()
+        _archive_kb_to_gcs()
         return jsonify({'status': 'deleted', 'total': total})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -798,6 +852,30 @@ def kb_rebuild():
     try:
         total = _rebuild_lancedb()
         return jsonify({'status': 'rebuilt', 'total': total})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/kb/archive', methods=['POST'])
+def kb_archive():
+    """Manually upload the current KB CSV to GCS."""
+    try:
+        _archive_kb_to_gcs()
+        return jsonify({'status': 'archived', 'bucket': GCS_BUCKET_NAME, 'blob': GCS_KB_BLOB})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/kb/restore', methods=['POST'])
+def kb_restore():
+    """Download KB CSV from GCS, overwrite local copy, and rebuild LanceDB."""
+    try:
+        client = gcs.Client()
+        bucket = client.bucket(GCS_BUCKET_NAME)
+        blob = bucket.blob(GCS_KB_BLOB)
+        blob.download_to_filename(KB_CSV_PATH)
+        total = _rebuild_lancedb()
+        return jsonify({'status': 'restored', 'total': total})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
