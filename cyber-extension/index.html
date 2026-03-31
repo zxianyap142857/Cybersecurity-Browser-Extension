@@ -378,7 +378,8 @@
           <h3 style="margin: 0;">Batch Scan Results</h3>
           <div style="display: flex; gap: 8px;">
             <button id="refresh-scan-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Refresh</button>
-            <button id="scan-page-btn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Scan Current Page</button>
+            <button id="batch-scan-page-btn" style="background-color: #7b1fa2; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Scan Page URLs</button>
+            <button id="scan-page-btn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Scan Current URL</button>
           </div>
         </div>
         <p id="batch-scan-meta" style="font-size: 13px; color: #666; margin: 6px 0 10px 0;"></p>
@@ -402,7 +403,7 @@
       <div id="knowledge-base-management-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
           <h2 style="margin: 0;">Knowledge Base Management</h2>
-          <button id="kb-rebuild-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">↻ Rebuild Vector DB</button>
+          <button id="kb-rebuild-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Rebuild Vector DB</button>
         </div>
         <p style="font-size: 14px; color: #555; margin: 0 0 14px 0;">Add or remove Q&amp;A entries. Every change automatically updates the chatbot's knowledge base.</p>
         <div id="kb-status" style="font-size: 14px; font-style: italic; color: #555; margin-bottom: 10px; min-height: 18px;"></div>
@@ -512,15 +513,22 @@
             <span style="margin-left: 10px;">Remove & Hidden Malicious Content</span>
           </div>
 
-          <div style="display: flex; align-items: center; margin-top: 10px;">
+          <div style="margin-top: 14px;">
+            <button type="button" id="batchScanActionBtn" style="background-color: #7b1fa2; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px;">
+              Batch Predict Page URLs
+            </button>
+            <p id="batchScanActionStatus" style="font-size: 13px; color: #666; margin: 6px 0 0 0;"></p>
+          </div>
+
+          <div style="display: flex; align-items: center; margin-top: 14px;">
             <label class="switch">
               <input type="checkbox" id="blockingPopupToggle">
               <span class="slider round"></span>
             </label>
-            <span style="margin-left: 10px;">Block Page with Phishing Warning Popup</span>
+            <span style="margin-left: 10px;">Block Page with Phishing Warning</span>
           </div>
           <p style="font-size: 13px; color: #666; margin: 6px 0 0 28px;">
-            Shows a full-page warning before entering websites detected as phishing (&gt;85% = Phishing, 50–84% = Suspicious).
+            Shows a full-page warning before entering websites detected as phishing (&gt;85% = Phishing, 50-84% = Suspicious).
           </p>
         </form>
 
