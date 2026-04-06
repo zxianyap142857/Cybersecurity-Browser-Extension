@@ -37,6 +37,13 @@ In Chrome: go to `chrome://extensions` → Enable Developer mode → Load unpack
 | `/fl_train` | POST | Start background federated learning run |
 | `/fl_status` | GET | Poll FL training progress |
 | `/api/history` | GET | Returns analysis history for Streamlit dashboard |
+| `/scan_page` | POST | Fetch a page, extract all links from HTML elements, batch predict |
+| `/kb/rows` | GET | Return all Knowledge Base Q&A rows |
+| `/kb/add` | POST | Append Q&A row, rebuild LanceDB, archive to GCS |
+| `/kb/delete` | POST | Delete row by index, rebuild LanceDB, archive to GCS |
+| `/kb/rebuild` | POST | Manually rebuild LanceDB from current CSV |
+| `/kb/archive` | POST | Manually upload KB CSV to GCS |
+| `/kb/restore` | POST | Download KB CSV from GCS, overwrite local, rebuild LanceDB |
 
 All prediction endpoints accept a `model` field: `"distilbert"` (default) or `"mobilebert"`.
 
@@ -69,15 +76,25 @@ index.html (popup)
 | `analysisResult` | object | `{ status, confidence }` — current tab result |
 | `scanHistory` | array | All scan records (batch and single) |
 | `dashboardStats` | object | Aggregate counters for dashboard |
+| `blockingPopupEnabled` | bool | Redirect to warning.html on phishing navigation |
+| `latestBatchScan` | object | `{ results[], timestamp }` — last batch scan for table display |
+| `allowedBlockedUrls` | array | (session storage) URLs user chose to proceed through |
 
 ### Protection Mode Logic
 
-The three toggles are mutually exclusive. `background.js` acts on `batch_predict` results:
-- `warningEnabled` → highlight links pink/red + show inline popup
-- `protectionEnabled` → remove anchor elements from DOM
-- `urlScanningEnabled` alone → badge update only
+The toggles in `background.js` act on `batch_predict` results:
+- `warningEnabled` → highlight phishing elements pink/red + badge on parent containers (`<tr>`, `<li>`, `<h1-6>`, `<article>`, `<section>`) + show inline warning popup
+- `protectionEnabled` → remove phishing elements and their parent containers from DOM
+- `urlScanningEnabled` alone → badge update only (no DOM changes)
+- `blockingPopupEnabled` → intercepts navigation via `webNavigation.onCommitted`, calls `/predict`, redirects to `warning.html` if phishing (≥85% = phishing level, 50-84% = suspicious level)
 
-Tabs with `file://`, `127.0.*`, `192.168.*`, `10.0.*`, `172.16.*` URLs are skipped entirely.
+Link extraction covers: `<a href>`, `<img src/data-src>`, `<li/tr/div/h1-h6>` with `href/data-href/data-url`, `<iframe/embed/source src>`.
+
+Tabs with `file://`, `127.0.0.1`, `localhost`, `192.168.*`, `10.*`, `172.16.*` URLs are skipped entirely.
+
+### Blocking Popup (warning.html)
+
+`warning.html` + `scripts/warning.js` — a full-page warning shown when `blockingPopupEnabled` intercepts a phishing URL. MV3 requires all JS to be in external files (no inline `<script>`). Uses `chrome.storage.session` for the allowed-URLs list (survives service worker restarts). "Proceed Anyway" stores the URL via `allowBlockedUrl` message to background, then navigates with `chrome.tabs.update()`.
 
 ### Model Architecture
 
@@ -103,7 +120,11 @@ Minimum 2 reports required. `/fl_status` is polled every 3 seconds from `popup.j
 
 ### RAG Chatbot
 
-`app.py` initialises StarCoder2-3B at startup (4-bit quantized via BitsAndBytes). Loads Q&A from `Datasets.csv` into LanceDB (`./RAGData_Backend`). The CSV path is hardcoded to `C:/Users/Yap Zheng Xian/Documents/Programming/Extension/notebook/notebook/Dataset.csv` — if not found the chatbot still works from the model's general knowledge.
+`app.py` initialises StarCoder2-3B at startup (4-bit quantized via BitsAndBytes). Loads Q&A from `Knowledge Base.csv` into LanceDB (`./Knowledge Base/RAGData_Backend`). Uses `StopOnTokens` stopping criteria to halt generation at "Human:", "User:", "Question:" tokens (both single- and multi-token sequences). `clean_response()` strips any remaining stop words (with or without colon) from the output.
+
+### Knowledge Base & GCS Archiving
+
+KB CSV at `Knowledge Base/Knowledge Base.csv`. After every `/kb/add` or `/kb/delete`, the CSV is auto-uploaded to `gs://cyber-fl-models/knowledge-base/Knowledge Base.csv` via `_archive_kb_to_gcs()` (non-fatal on failure). `/kb/restore` downloads from GCS and rebuilds LanceDB. Requires `google-cloud-storage` and valid GCP credentials.
 
 ### Streamlit Dashboard
 
@@ -125,9 +146,18 @@ Minimum 2 reports required. `/fl_status` is polled every 3 seconds from `popup.j
 | `lancedb` | Vector store for RAG chatbot |
 | `selenium` + `webdriver-manager` | Cookie metadata scraping |
 | `flask-cors` | Allow extension origin to call Flask |
+| `google-cloud-storage` | Knowledge Base archiving to GCS |
+
+## Common Gotchas
+
+- **MV3 CSP**: Extension HTML pages cannot use inline `<script>`. All JS must be in separate `.js` files referenced via `<script src="...">`.
+- **Meta tensor error**: StarCoder2's `device_map="auto"` (transformers 4.57+) can contaminate subsequent `from_pretrained` calls. Phishing model loading uses explicit `device_map=None, low_cpu_mem_usage=False` to prevent this.
+- **Service worker lifecycle**: In-memory state (e.g., `Set()`) is lost when the SW restarts. Use `chrome.storage.session` for data that must survive restarts (e.g., allowed blocked URLs).
+- **`onInstalled` resets**: Toggle defaults are only set if the key is `undefined`, preserving user choices across extension reloads.
+- **venv location**: The project venv is at `Extension/venv/` (parent of `cyber-extension/`). Install packages with the venv's pip, not the system Python.
 
 ## Federated Learning Properties
-GCP FL Server: https://fl-server-499617779384.asia-southeast1.run.app
+GCP FL Server: Set via `gcp_url` parameter in `/fl_train` POST request
 Bucket:        gs://cyber-fl-models
 Region:        asia-southeast1
 MIN_CLIENTS:   2

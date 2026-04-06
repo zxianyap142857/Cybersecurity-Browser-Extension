@@ -1,3 +1,18 @@
+// --- Backend URL with fallback (Edge may block 127.0.0.1 via Tracking Prevention) ---
+const BACKEND_URLS = ['http://127.0.0.1:5000', 'http://localhost:5000'];
+
+async function backendFetch(path, options = {}) {
+  for (const base of BACKEND_URLS) {
+    try {
+      const res = await fetch(base + path, options);
+      return res;
+    } catch (e) {
+      console.warn(`[backendFetch] ${base}${path} failed:`, e.message);
+    }
+  }
+  throw new Error(`All backend URLs failed for ${path}`);
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   // Initialize dashboard stats if they don't exist
   chrome.storage.local.get(['dashboardStats', 'scanHistory', 'protectionEnabled', 'warningEnabled', 'urlScanningEnabled', 'blockingPopupEnabled'], (result) => {
@@ -115,7 +130,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     
     // Scan a single URL via /predict and update badge + analysisResult
     function scanSingleUrl(tabId, pageUrl, modelName) {
-      fetch('http://127.0.0.1:5000/predict', {
+      backendFetch('/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: pageUrl, model: modelName }),
@@ -187,7 +202,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         // 2. Send links to the backend for batch prediction
         chrome.storage.local.get(['selectedModel'], (modelData) => {
           const selectedModel = modelData.selectedModel || 'distilbert';
-          fetch('http://127.0.0.1:5000/batch_predict', {
+          backendFetch('/batch_predict', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ urls: httpLinks, model: selectedModel }),
@@ -427,15 +442,19 @@ function removeSpecificLinks(phishingLinks) {
 // Use webNavigation.onCommitted for EARLY interception (fires before page renders)
 // Use chrome.storage.session for allowed URLs (survives service worker restarts)
 
-chrome.webNavigation.onCommitted.addListener((details) => {
-  // Only main frame navigations, skip subframes
-  if (details.frameId !== 0) return;
-  const pageUrl = details.url;
+// --- Blocking Popup helper: shared logic for URL checking ---
+const _pendingBlockChecks = new Set();  // Dedup: prevent double /predict for same tab+url
 
+function _checkAndBlockUrl(tabId, pageUrl) {
+  const key = `${tabId}:${pageUrl}`;
+  if (_pendingBlockChecks.has(key)) return;
+  _pendingBlockChecks.add(key);
+  // Auto-clear after 10s to avoid memory leak
+  setTimeout(() => _pendingBlockChecks.delete(key), 10000);
   // Skip non-http pages and extension pages
   if (!pageUrl.startsWith('http://') && !pageUrl.startsWith('https://')) return;
 
-  // Skip localhost / local network (no need to scan the Flask backend itself)
+  // Skip localhost / local network
   try {
     const urlObj = new URL(pageUrl);
     const host = urlObj.hostname;
@@ -460,7 +479,7 @@ chrome.webNavigation.onCommitted.addListener((details) => {
       const modelName = data.selectedModel || 'distilbert';
       console.log('[BlockingPopup] Sending /predict for:', pageUrl, 'model:', modelName);
 
-      fetch('http://127.0.0.1:5000/predict', {
+      backendFetch('/predict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: pageUrl, model: modelName }),
@@ -472,16 +491,28 @@ chrome.webNavigation.onCommitted.addListener((details) => {
         .then(result => {
           console.log('[BlockingPopup] Prediction result:', JSON.stringify(result));
           const confStr = result.confidence || '0%';
-          const confNum = parseFloat(confStr);   // e.g. "92.35%" → 92.35
-          console.log('[BlockingPopup] prediction:', result.prediction, '| confidence:', confNum, '| includes PHISHING:', result.prediction && result.prediction.includes('PHISHING'), '| >= 50:', confNum >= 50);
+          const confNum = parseFloat(confStr);
           if (result.prediction && result.prediction.includes('PHISHING') && confNum >= 50) {
             const level = confNum >= 85 ? 'phishing' : 'suspicious';
             const warningUrl = chrome.runtime.getURL('warning.html')
               + '?level=' + encodeURIComponent(level)
               + '&confidence=' + encodeURIComponent(confNum)
               + '&url=' + encodeURIComponent(pageUrl);
-            console.log('[BlockingPopup] REDIRECTING tab', details.tabId, 'to warning page. Level:', level, 'Confidence:', confNum);
-            chrome.tabs.update(details.tabId, { url: warningUrl });
+            console.log('[BlockingPopup] REDIRECTING tab', tabId, 'to warning page. Level:', level, 'Confidence:', confNum);
+            chrome.tabs.update(tabId, { url: warningUrl }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[BlockingPopup] tabs.update failed:', chrome.runtime.lastError.message,
+                  '— retrying in 500ms');
+                // Tab may be showing error page; retry after short delay
+                setTimeout(() => {
+                  chrome.tabs.update(tabId, { url: warningUrl }, () => {
+                    if (chrome.runtime.lastError) {
+                      console.error('[BlockingPopup] Retry also failed:', chrome.runtime.lastError.message);
+                    }
+                  });
+                }, 500);
+              }
+            });
           } else {
             console.log('[BlockingPopup] URL is safe, no redirect needed.');
           }
@@ -489,6 +520,18 @@ chrome.webNavigation.onCommitted.addListener((details) => {
         .catch(err => console.error('[BlockingPopup] Predict FETCH error:', err));
     });
   });
+}
+
+// Use onBeforeNavigate for earliest interception (fires before the request is made)
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+  if (details.frameId !== 0) return;
+  _checkAndBlockUrl(details.tabId, details.url);
+});
+
+// Also listen on onCommitted as a fallback (fires after server responds)
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0) return;
+  _checkAndBlockUrl(details.tabId, details.url);
 });
 
 function highlightAndWarnLinks(phishingLinksWithConfidence) {

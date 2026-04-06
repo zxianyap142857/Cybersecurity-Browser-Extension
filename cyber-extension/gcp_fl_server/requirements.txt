@@ -1,0 +1,6 @@
+flask==3.0.3
+flask-cors==4.0.1
+google-cloud-storage==2.16.0
+safetensors==0.4.3
+numpy==1.26.4
+gunicorn==22.0.0

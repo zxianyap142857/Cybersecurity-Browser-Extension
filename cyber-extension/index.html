@@ -1,14 +1,47 @@
 <style>
+      /* ===== Theme Variables ===== */
+      :root {
+        --bg-body: #ebeca5;
+        --bg-topnav: #c7cef7;
+        --bg-sidebar: #f8d2ff;
+        --bg-card: #ffffff;
+        --bg-input: #f0f0f0;
+        --text-primary: #000000;
+        --text-secondary: #555555;
+        --text-muted: #888888;
+        --border-color: #cccccc;
+        --shadow-card: 0 2px 4px rgba(0,0,0,0.1);
+        --sidebar-link: #251010;
+        --sidebar-hover: #818181;
+        --table-header: #c7cef7;
+      }
+      [data-theme="dark"] {
+        --bg-body: #080818;
+        --bg-topnav: #0e0e28;
+        --bg-sidebar: #0e0e28;
+        --bg-card: #12122e;
+        --bg-input: #1a1a3e;
+        --text-primary: #e4e4f0;
+        --text-secondary: #a0a0b8;
+        --text-muted: #8c8cca;
+        --border-color: #252548;
+        --shadow-card: 0 4px 16px rgba(0,0,0,0.5);
+        --sidebar-link: #c8c8e0;
+        --sidebar-hover: #a0a0db;
+        --table-header: #1a1a3e;
+      }
       body{
         font-family: "Courier New", Courier, monospace;
         font-size:18px;
-        min-width:800px;
+        min-width:600px;
         min-height: 750px;
         padding-top: 50px;
         margin: 0px;
-        background-color: #ebeca5;
+        background-color: var(--bg-body);
+        color: var(--text-primary);
         border-radius: 30px;
         overflow: auto;
+        transition: background-color 0.3s, color 0.3s;
       }
       #resize-handle {
         position: fixed;
@@ -26,8 +59,9 @@
         display: flex;
         align-items: center;
         padding: 10px;
-        background-color: #c7cef7;
-        color: rgb(0, 0, 0);
+        background-color: var(--bg-topnav);
+        color: var(--text-primary);
+        transition: background-color 0.3s, color 0.3s;
         position: fixed;
         width: 100%;
         top:0;
@@ -48,7 +82,8 @@
         z-index: 1;
         top: 60px; /* Position below top nav */
         left: 0;
-        background-color: #f8d2ff;
+        background-color: var(--bg-sidebar);
+        transition: background-color 0.3s, width 0.5s;
         overflow-x: hidden;
         transition: 0.5s;
         box-sizing: border-box;
@@ -68,7 +103,7 @@
         padding: 8px 8px 8px 32px;
         text-decoration: none;
         font-size: 20px;
-        color: #251010;
+        color: var(--sidebar-link);
         display: flex;
         align-items: center;
         transition: 0.3s;
@@ -79,7 +114,7 @@
         padding-right:20px;
       }
       #sidebar a:hover {
-        color: #818181;
+        color: var(--sidebar-hover);
       }
       #sidebar.sidebar-open a {
         white-space: normal;
@@ -145,7 +180,7 @@
       #confidence {
         margin-top: 10px;
         font-weight: bold;
-        color: #333;
+        color: var(--text-primary);
       }
       .chatInput{
         border-radius: 100px;
@@ -174,6 +209,9 @@
       .content-section {
         margin-left: 80px;
         transition: margin-left 0.5s;
+        max-width: calc(100% - 80px);
+        box-sizing: border-box;
+        overflow-x: hidden;
       }
       /* Chatbox Styles */
       .chat-log {
@@ -235,26 +273,98 @@
       #chatInput {
         flex-grow: 1;
       }
-      /*Dashboard*/
-      .metric-card{
-        font-size: 24px;
-        font-weight: bold;
-        text-align: center;
-        background: #c3f8fc; 
-        padding-left: 20px;
-        padding-right: 20px;
-        border-radius: 8px; 
-        flex: 1; 
-        text-align: center; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      /* ===== Dashboard Redesign ===== */
+      .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+      .dash-header h2 { margin: 0; }
+      .theme-toggle {
+        background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary);
+        padding: 8px 18px; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 13px;
+        display: flex; align-items: center; gap: 8px; transition: all 0.3s;
       }
-      .dashboard-metrics{
-        flex-direction: column;
-        display: flex; 
-        gap: 20px; 
-        margin-bottom: 20px;
-        justify-content: space-between;
+      .theme-toggle:hover { border-color: var(--text-secondary); background: var(--bg-input); }
+      .dash-top-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin-bottom: 20px; }
+      .dash-card {
+        background: var(--bg-card); border-radius: 16px; padding: 20px;
+        box-shadow: var(--shadow-card); border: 1px solid var(--border-color);
+        transition: background-color 0.3s, border-color 0.3s;
       }
+      .dash-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+      .dash-section-header h3 { margin: 0; font-size: 16px; }
+      .dash-badge {
+        background: var(--bg-input); border: 1px solid var(--border-color); padding: 4px 12px;
+        border-radius: 6px; font-size: 12px; color: var(--text-secondary);
+      }
+      .dash-metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .dash-metric-card {
+        display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;
+        background: var(--bg-input); border: 1px solid var(--border-color); transition: background-color 0.3s;
+      }
+      .dash-metric-icon {
+        width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+        justify-content: center; flex-shrink: 0; font-size: 20px; color: white;
+      }
+      .dash-metric-info { min-width: 0; }
+      .dash-metric-value { font-size: 22px; font-weight: 700; margin: 0; line-height: 1.2; }
+      .dash-metric-value.phishing-val { color: #ff4757; }
+      .dash-metric-value.legit-val { color: #2ecc71; }
+      .dash-metric-label { font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0; white-space: nowrap; }
+      .dash-metric-change { font-size: 11px; font-weight: 600; margin: 2px 0 0 0; }
+      .dash-risk-score-card { display: flex; flex-direction: column; }
+      .dash-risk-gauge { position: relative; width: 160px; height: 160px; margin: 0 auto; }
+      .dash-risk-label {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;
+      }
+      .dash-risk-number { display: block; font-size: 32px; font-weight: 700; line-height: 1; }
+      .dash-risk-level {
+        display: inline-block; font-size: 12px; font-weight: 600; margin-top: 4px;
+        padding: 2px 14px; border-radius: 12px;
+      }
+      .dash-charts-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin-bottom: 20px; }
+      .dash-chart-body { flex-grow: 1; position: relative; min-height: 0; height: 220px; }
+      .dash-doughnut-body { display: flex; align-items: center; justify-content: center; }
+      .dash-filter-btn {
+        display: flex; align-items: center; gap: 6px; background: var(--bg-input);
+        border: 1px solid var(--border-color); color: var(--text-secondary);
+        padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;
+      }
+      .dash-filter-btn:hover { border-color: var(--text-secondary); }
+      .dash-table-card { margin-bottom: 20px; }
+      .dash-table-wrapper { overflow-x: auto; max-height: 300px; }
+      .dash-table { width: 100%; border-collapse: collapse; }
+      .dash-table thead tr { background: var(--table-header); position: sticky; top: 0; }
+      .dash-table th {
+        padding: 10px 12px; text-align: left; font-size: 13px; font-weight: 600;
+        color: var(--text-secondary); border-bottom: 1px solid var(--border-color);
+      }
+      .dash-table th:last-child { text-align: center; }
+      .dash-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border-color); }
+      .dash-table td:last-child { text-align: center; }
+      .dash-btn-danger {
+        background: #d9534f; color: white; border: none; padding: 6px 14px; border-radius: 6px;
+        cursor: pointer; font-weight: 600; font-size: 13px; font-family: inherit;
+      }
+      .dash-btn-danger:hover { background: #c9302c; }
+      .filter-option {
+        padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 13px; color: var(--text-primary);
+      }
+      .filter-option:hover { background: var(--bg-input); }
+
+      /* ===== Dark mode overrides for other sections ===== */
+      [data-theme="dark"] .info { border-color: var(--border-color); background: var(--bg-input); }
+      [data-theme="dark"] .cookie-card { background: var(--bg-card); border-color: var(--border-color); }
+      [data-theme="dark"] .cookie-header { background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary); }
+      [data-theme="dark"] .chat-log { background: var(--bg-card); border-color: var(--border-color); }
+      [data-theme="dark"] select,
+      [data-theme="dark"] input[type="text"],
+      [data-theme="dark"] input[type="password"],
+      [data-theme="dark"] input[type="date"],
+      [data-theme="dark"] textarea { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-color); }
+      [data-theme="dark"] .user-message .message-content { background: #1a3a2a; color: var(--text-primary); }
+      [data-theme="dark"] .bot-message .message-content { background: #0a2a3a; border-color: #1a4a5a; color: var(--text-primary); }
+      [data-theme="dark"] #batch-scan-table thead tr,
+      [data-theme="dark"] #kb-table thead tr { background: var(--table-header); }
+      [data-theme="dark"] #batch-scan-table th, [data-theme="dark"] #kb-table th,
+      [data-theme="dark"] #batch-scan-table td, [data-theme="dark"] #kb-table td { border-color: var(--border-color); }
 
     </style>
     <script src="scripts/chart.js"></script>
@@ -265,7 +375,8 @@
         <img src="images/hamburger icon.png" alt="Menu" width="30" style="padding-left: 20px;">
       </div>
       <img src="images/Hacker.png" width="75"></img>
-      <h2 style="padding-left: 20px;">Cybersecurity Browser Extension</h2>
+      <h2 style="padding-left: 20px; flex-grow: 1;">Cybersecurity Browser Extension</h2>
+      <button id="theme-toggle-btn" class="theme-toggle" title="Switch Theme" style="margin-right: 50px;">Switch to Dark</button>
     </div>
     <div id="container">
       <div id="sidebar">
@@ -280,74 +391,131 @@
         </ul>
       </div>
 
-      <div id="dashboard-content" class="content-section" style="padding: 16px; flex-grow: 1; padding-left:40px">
-        <h2>Dashboard</h2>
-        
-        <!-- Metrics Cards -->
-        <div class="dashboard-metrics" >
-            <div class="metric-card" style="background: #84dcf7; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h3>Total Scanned URLs</h3>
-                <p id="total-scanned" style="font-size: 24px; font-weight: bold;">0</p>
-                <p id="total-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
-            </div>
-            <div class="metric-card" style="background: #84dcf7; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h3>Phishing Link Founded</h3>
-                <p id="phishing-detected" style="font-size: 24px; font-weight: bold; color: #d9534f;">0</p>
-                <p id="phishing-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
-            </div>
-            <div class="metric-card" style="background: #84dcf7; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <h3>Legitimate Link Founded</h3>
-                <p id="legitimate-sites" style="font-size: 24px; font-weight: bold; color: #5cb85c;">0</p>
-                <p id="legit-change" style="font-size: 20px; margin-top: 5px; font-weight: bold;"></p>
-            </div>
+      <div id="dashboard-content" class="content-section" style="padding: 16px; flex-grow: 1; padding-left:40px; padding-right:30px;">
+        <!-- Dashboard Header -->
+        <div class="dash-header">
+          <h2 style="margin-top:20px;">Cybersecurity Dashboard</h2>
         </div>
 
-        <!-- Chart Container -->
-        <div class="chart-container" style="background: #f5bef7; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: 300px; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0;">Threat Trends</h3>
-                <div style="position: relative;">
-                    <img src="images/filter.png" id="filter-btn" width="24" style="cursor: pointer;" title="Filter Time Range">
-                    <div id="filter-menu" style="display: none; position: absolute; right: 0; top: 30px; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 5px; z-index: 100; width: 200px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
-                        <div class="filter-option" data-range="24h" style="padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;">Last 24 Hours</div>
-                        <div class="filter-option" data-range="3d" style="padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;">Last 3 Days</div>
-                        <div class="filter-option" data-range="7d" style="padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;">Last 7 Days</div>
-                        <div class="filter-option" data-range="custom" style="padding: 8px; cursor: pointer;">Custom Range</div>
-                        <div id="custom-range-inputs" style="display: none; padding: 8px; background: #f9f9f9; border-top: 1px solid #eee;">
-                            <label style="font-size: 12px;">Start:</label> <input type="date" id="start-date" style="width: 100%; margin-bottom: 5px;">
-                            <label style="font-size: 12px;">End:</label> <input type="date" id="end-date" style="width: 100%; margin-bottom: 5px;">
-                            <button id="apply-custom-filter" style="width: 100%; cursor: pointer;">Apply</button>
-                        </div>
-                    </div>
+        <!-- Top Row: Metrics + Risk Score -->
+        <div class="dash-top-row">
+          <!-- Current Risk Section -->
+          <div class="dash-card">
+            <div class="dash-section-header">
+              <h3>Current Risk</h3>
+              <span class="dash-badge">Daily</span>
+            </div>
+            <div class="dash-metrics-grid">
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #ff9a56, #ff6b35);">&#9678;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value" id="total-scanned">0</p>
+                  <p class="dash-metric-label">Total Scanned</p>
+                  <p class="dash-metric-change" id="total-change"></p>
                 </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #ff4757, #c0392b);">&#9888;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value phishing-val" id="phishing-detected">0</p>
+                  <p class="dash-metric-label">Phishing Found</p>
+                  <p class="dash-metric-change" id="phishing-change"></p>
+                </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">&#10003;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value legit-val" id="legitimate-sites">0</p>
+                  <p class="dash-metric-label">Legitimate URLs</p>
+                  <p class="dash-metric-change" id="legit-change"></p>
+                </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #a855f7, #7c3aed);">%</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value" id="detection-rate">0%</p>
+                  <p class="dash-metric-label">Phishing Rate</p>
+                </div>
+              </div>
             </div>
-            <div style="flex-grow: 1; position: relative; min-height: 0;">
-                <canvas id="threatChart"></canvas>
+          </div>
+
+          <!-- Risk Score Gauge -->
+          <div class="dash-card dash-risk-score-card">
+            <div class="dash-section-header">
+              <h3>Risk Score</h3>
             </div>
+            <div class="dash-risk-gauge">
+              <canvas id="riskScoreChart"></canvas>
+              <div class="dash-risk-label">
+                <span class="dash-risk-number" id="risk-score-value">0</span>
+                <span class="dash-risk-level" id="risk-score-level">Low</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Recent Activity Table -->
-        <div class="recent-activity" style="background: #e082c4; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0;">Recent Activity Log</h3>
-                <button id="clear-history-btn" style="background-color: #d9534f; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;">Clear History</button>
+        <!-- Charts Row -->
+        <div class="dash-charts-row">
+          <div class="dash-card dash-chart-main">
+            <div class="dash-section-header">
+              <h3>Threat Summary</h3>
+              <div style="position: relative;">
+                <button class="dash-filter-btn" id="filter-btn">
+                  <img src="images/filter.png" width="16" alt="Filter"> Filter
+                </button>
+                <div id="filter-menu" style="display: none; position: absolute; right: 0; top: 36px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; z-index: 100; width: 200px; box-shadow: var(--shadow-card);">
+                  <div class="filter-option" data-range="24h">Last 24 Hours</div>
+                  <div class="filter-option" data-range="3d">Last 3 Days</div>
+                  <div class="filter-option" data-range="7d">Last 7 Days</div>
+                  <div class="filter-option" data-range="custom">Custom Range</div>
+                  <div id="custom-range-inputs" style="display: none; padding: 8px; border-top: 1px solid var(--border-color);">
+                    <label style="font-size: 12px;">Start:</label>
+                    <input type="date" id="start-date" style="width: 100%; margin-bottom: 5px;">
+                    <label style="font-size: 12px;">End:</label>
+                    <input type="date" id="end-date" style="width: 100%; margin-bottom: 5px;">
+                    <button id="apply-custom-filter" style="width: 100%; cursor: pointer;">Apply</button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div style="overflow-x: auto; max-height: 300px;">
-                <table id="activity-table" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background-color: #e082c4; position: sticky; top: 0;">
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Time</th>
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">URL / Type</th>
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Result</th>
-                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #000000;">Confidence</th>
-                            <th style="padding: 8px; text-align: center; border-bottom: 1px solid #000000;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be populated by JS -->
-                    </tbody>
-                </table>
+            <div class="dash-chart-body">
+              <canvas id="threatChart"></canvas>
             </div>
+          </div>
+
+          <div class="dash-card dash-chart-side">
+            <div class="dash-section-header">
+              <h3>Detection Breakdown</h3>
+            </div>
+            <div class="dash-chart-body dash-doughnut-body">
+              <canvas id="percentageChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Table -->
+        <div class="dash-card dash-table-card">
+          <div class="dash-section-header">
+            <h3>Threat Details</h3>
+            <button id="clear-history-btn" class="dash-btn-danger">Clear History</button>
+          </div>
+          <div class="dash-table-wrapper">
+            <table id="activity-table" class="dash-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>URL / Type</th>
+                  <th>Result</th>
+                  <th>Confidence</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated by JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -359,6 +527,21 @@
             <option value="distilbert">DistilBERT</option>
             <option value="mobilebert">MobileBERT</option>
           </select>
+          <button id="update-model-btn" style="margin-left: 10px; background-color: #ff9800; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">
+            Update Model
+          </button>
+        </div>
+
+        <!-- Model Update Progress -->
+        <div id="model-update-progress" style="display: none; margin-bottom: 20px; padding: 12px 16px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span id="model-update-label" style="font-size: 13px; font-weight: 600; color: #333;">Downloading model...</span>
+            <span id="model-update-percent" style="font-size: 13px; font-weight: bold; color: #ff9800;">0%</span>
+          </div>
+          <div style="width: 100%; height: 12px; background: #e0e0e0; border-radius: 6px; overflow: hidden;">
+            <div id="model-update-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ff9800, #f57c00); border-radius: 6px; transition: width 0.3s ease;"></div>
+          </div>
+          <p id="model-update-file" style="font-size: 11px; color: #888; margin: 4px 0 0 0;"></p>
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
           <label class="switch">
@@ -382,7 +565,7 @@
             <button id="scan-page-btn" style="background-color: #2196F3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">Scan Current URL</button>
           </div>
         </div>
-        <p id="batch-scan-meta" style="font-size: 13px; color: #666; margin: 6px 0 10px 0;"></p>
+        <p id="batch-scan-meta" style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 10px 0;"></p>
         <div style="overflow-x: auto; max-height: 350px; border: 1px solid #ccc; border-radius: 6px;">
           <table id="batch-scan-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <thead>
@@ -394,7 +577,7 @@
               </tr>
             </thead>
             <tbody id="batch-scan-tbody">
-              <tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No scan data yet. Scan a page to see results.</td></tr>
+              <tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">No scan data yet. Scan a page to see results.</td></tr>
             </tbody>
           </table>
         </div>
@@ -405,8 +588,8 @@
           <h2 style="margin: 0;">Knowledge Base Management</h2>
           <button id="kb-rebuild-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Rebuild Vector DB</button>
         </div>
-        <p style="font-size: 14px; color: #555; margin: 0 0 14px 0;">Add or remove Q&amp;A entries. Every change automatically updates the chatbot's knowledge base.</p>
-        <div id="kb-status" style="font-size: 14px; font-style: italic; color: #555; margin-bottom: 10px; min-height: 18px;"></div>
+        <p style="font-size: 14px; color: var(--text-secondary); margin: 0 0 14px 0;">Add or remove Q&amp;A entries. Every change automatically updates the chatbot's knowledge base.</p>
+        <div id="kb-status" style="font-size: 14px; font-style: italic; color: var(--text-secondary); margin-bottom: 10px; min-height: 18px;"></div>
 
         <!-- Table -->
         <div style="overflow-x: auto; max-height: 340px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 20px;">
@@ -420,7 +603,7 @@
               </tr>
             </thead>
             <tbody id="kb-tbody">
-              <tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">Loading…</td></tr>
+              <tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -430,12 +613,12 @@
         <form id="kb-add-form">
           <div style="margin-bottom: 10px;">
             <label style="font-weight: bold; font-size: 14px;">Question:</label><br>
-            <input type="text" id="kb-question-input" placeholder="Enter question…"
+            <input type="text" id="kb-question-input" placeholder="Enter question..."
               style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px;">
           </div>
           <div style="margin-bottom: 14px;">
             <label style="font-weight: bold; font-size: 14px;">Answer:</label><br>
-            <textarea id="kb-output-input" rows="4" placeholder="Enter answer…"
+            <textarea id="kb-output-input" rows="4" placeholder="Enter answer..."
               style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
           </div>
           <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 9px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">+ Add Entry</button>
@@ -470,7 +653,7 @@
             style="flex: 1; min-width: 180px; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-family: inherit;">
           <button id="claude-key-save-btn" style="background-color: #4CAF50; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Save</button>
           <button id="claude-key-clear-btn" style="background-color: #d9534f; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Clear</button>
-          <span id="claude-key-status" style="font-size: 12px; color: #555;"></span>
+          <span id="claude-key-status" style="font-size: 12px; color: var(--text-secondary);"></span>
         </div>
 
         <div id="chatLog" class="chat-log"></div>
@@ -481,7 +664,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
           <input type="checkbox" id="attach-html-cb" style="width: 16px; height: 16px; cursor: pointer;">
-          <label for="attach-html-cb" style="font-size: 13px; color: #555; cursor: pointer;">Attach current page HTML for auditing</label>
+          <label for="attach-html-cb" style="font-size: 13px; color: var(--text-secondary); cursor: pointer;">Attach current page HTML for auditing</label>
         </div>
       </div>
 
@@ -517,7 +700,7 @@
             <button type="button" id="batchScanActionBtn" style="background-color: #7b1fa2; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px;">
               Batch Predict Page URLs
             </button>
-            <p id="batchScanActionStatus" style="font-size: 13px; color: #666; margin: 6px 0 0 0;"></p>
+            <p id="batchScanActionStatus" style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 0 0;"></p>
           </div>
 
           <div style="display: flex; align-items: center; margin-top: 14px;">
@@ -527,7 +710,7 @@
             </label>
             <span style="margin-left: 10px;">Block Page with Phishing Warning</span>
           </div>
-          <p style="font-size: 13px; color: #666; margin: 6px 0 0 28px;">
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 0 28px;">
             Shows a full-page warning before entering websites detected as phishing (&gt;85% = Phishing, 50-84% = Suspicious).
           </p>
         </form>
@@ -536,7 +719,7 @@
 
       <div id="report-phishing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
         <h2>Report Model Error</h2>
-        <p style="color:#555; font-size:15px;">Help improve detection accuracy by reporting incorrect predictions. Submitted reports are used for Federated Learning (Flower + PEFT LoRA) to fine-tune the selected model.</p>
+        <p style="color: var(--text-secondary); font-size:15px;">Help improve detection accuracy by reporting incorrect predictions. Submitted reports are used for Federated Learning (Flower + PEFT LoRA) to fine-tune the selected model.</p>
 
         <form id="report-form">
           <div style="margin-bottom: 15px;">
@@ -563,7 +746,7 @@
           <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Submit Report</button>
         </form>
 
-        <div id="report-status" style="margin-top: 14px; font-style: italic; color: #333;"></div>
+        <div id="report-status" style="margin-top: 14px; font-style: italic; color: var(--text-primary);"></div>
 
         <hr style="margin: 28px 0; border: none; border-top: 1px solid #bbb;">
 
@@ -585,18 +768,18 @@
             <label for="gcp-url-input"><strong>GCP Server URL:</strong></label><br>
             <input type="text" id="gcp-url-input" placeholder="https://fl-server-xxxx-uc.a.run.app"
               style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
-            <p style="font-size:13px; color:#888; margin:4px 0 0 0;">Cloud Run service URL from GCP console.</p>
+            <p style="font-size:13px; color: var(--text-muted); margin:4px 0 0 0;">Cloud Run service URL from GCP console.</p>
           </div>
           <div>
-            <label for="gcp-api-key-input"><strong>API Key:</strong> <span style="font-weight:normal; color:#666;">(optional)</span></label><br>
+            <label for="gcp-api-key-input"><strong>API Key:</strong> <span style="font-weight:normal; color: var(--text-secondary);">(optional)</span></label><br>
             <input type="password" id="gcp-api-key-input" placeholder="Leave blank if not set"
               style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
           </div>
         </div>
 
-        <p style="font-size:14px; color:#666;">Minimum 2 reports required. Training runs LoRA fine-tuning (3 FL rounds). The updated model is saved and used immediately.</p>
+        <p style="font-size:14px; color: var(--text-secondary);">Minimum 2 reports required. Training runs LoRA fine-tuning (3 FL rounds). The updated model is saved and used immediately.</p>
         <button id="fl-train-btn" style="background-color: #2196F3; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Train Model Now</button>
-        <div id="fl-status-display" style="margin-top: 12px; font-style: italic; color: #555;"></div>
+        <div id="fl-status-display" style="margin-top: 12px; font-style: italic; color: var(--text-secondary);"></div>
       </div>
 
     </div>
