@@ -44,8 +44,10 @@ from google.cloud import storage as gcs
 # --- RAG Chatbot Setup ---
 # Set environment variables for model caching.
 # Replace 'X:/AI_Models' with a folder on a drive that has 15GB+ free space.
-os.environ['HF_HOME'] = 'X:/AI_Models'
-os.environ['TRANSFORMERS_CACHE'] = 'X:/AI_Models'
+# Model cache directory — override with HF_HOME env var if needed
+_default_cache = os.path.join(os.path.expanduser('~'), '.cache', 'huggingface')
+os.environ.setdefault('HF_HOME', os.environ.get('HF_HOME', _default_cache))
+os.environ.setdefault('TRANSFORMERS_CACHE', os.environ.get('TRANSFORMERS_CACHE', _default_cache))
 
 app = Flask(__name__)
 CORS(app)
@@ -77,6 +79,82 @@ def _archive_kb_to_gcs():
     except Exception as e:
         print(f"[KB] GCS archive failed (non-fatal): {e}")
 
+# --- Model Update from GCS ---
+GCS_MODEL_PREFIXES = {
+    'distilbert': 'models/distilbert/Distil BERT/',
+    'mobilebert': 'models/mobilebert/Mobile BERT/',
+}
+
+_model_update_status = {
+    'state': 'idle',        # idle | downloading | done | error
+    'model': None,
+    'progress': 0,          # 0-100
+    'current_file': '',
+    'total_files': 0,
+    'completed_files': 0,
+    'error': None,
+}
+_model_update_lock = threading.Lock()
+
+def _download_model_from_gcs(model_name):
+    """Download model files from GCS to the local model directory with progress tracking."""
+    global _model_update_status
+    try:
+        prefix = GCS_MODEL_PREFIXES.get(model_name)
+        if not prefix:
+            raise ValueError(f"Unknown model: {model_name}")
+
+        local_dir = MODEL_PATHS[model_name]
+        os.makedirs(local_dir, exist_ok=True)
+
+        client = gcs.Client()
+        bucket = client.bucket(GCS_BUCKET_NAME)
+        blobs = list(bucket.list_blobs(prefix=prefix))
+
+        if not blobs:
+            raise ValueError(f"No files found in gs://{GCS_BUCKET_NAME}/{prefix}")
+
+        total = len(blobs)
+        _model_update_status.update({
+            'state': 'downloading',
+            'model': model_name,
+            'progress': 0,
+            'total_files': total,
+            'completed_files': 0,
+            'current_file': '',
+            'error': None,
+        })
+
+        for i, blob in enumerate(blobs):
+            filename = blob.name.split('/')[-1]
+            if not filename:
+                continue
+            _model_update_status['current_file'] = filename
+            local_path = os.path.join(local_dir, filename)
+
+            print(f"[ModelUpdate] Downloading {filename} ({i+1}/{total})...")
+            blob.download_to_filename(local_path)
+
+            _model_update_status['completed_files'] = i + 1
+            _model_update_status['progress'] = int(((i + 1) / total) * 100)
+
+        # Invalidate cached model so next prediction loads the new weights
+        invalidate_model_cache(model_name)
+
+        _model_update_status.update({
+            'state': 'done',
+            'progress': 100,
+            'current_file': '',
+        })
+        print(f"[ModelUpdate] {model_name} updated successfully ({total} files).")
+
+    except Exception as e:
+        _model_update_status.update({
+            'state': 'error',
+            'error': str(e),
+        })
+        print(f"[ModelUpdate] Error: {e}")
+
 # --- Federated learning module ---
 from federated.fl_training import (
     run_federated_training,
@@ -88,24 +166,58 @@ from federated.fl_training import (
 # Global variable to store analysis history for dashboard purpose
 analysis_history = []
 
-# --- Model Loading Helper ---
+# --- Model Loading Helper (thread-safe with caching) ---
+_model_cache = {}           # { model_name: (tokenizer, model, device) }
+_model_lock = threading.Lock()  # Prevents concurrent model loads
+
 def load_phishing_model(model_name='distilbert'):
-    """Loads the tokenizer and model for the specified architecture."""
-    load_dir = MODEL_PATHS.get(model_name, MODEL_PATHS['distilbert'])
-    if model_name == 'mobilebert':
-        tokenizer = MobileBertTokenizer.from_pretrained(load_dir)
-        model = MobileBertForSequenceClassification.from_pretrained(
-            load_dir, device_map=None, low_cpu_mem_usage=False
-        )
-    else:
-        tokenizer = DistilBertTokenizer.from_pretrained(load_dir)
-        model = DistilBertForSequenceClassification.from_pretrained(
-            load_dir, device_map=None, low_cpu_mem_usage=False
-        )
-    model.eval()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    return tokenizer, model, device
+    """Loads the tokenizer and model for the specified architecture.
+    Caches loaded models to avoid reloading on every request.
+    Thread-safe: only one thread can load a model at a time."""
+    # Return cached model if available
+    if model_name in _model_cache:
+        return _model_cache[model_name]
+
+    with _model_lock:
+        # Double-check after acquiring lock (another thread may have loaded it)
+        if model_name in _model_cache:
+            return _model_cache[model_name]
+
+        print(f"[Model] Loading {model_name}...")
+        load_dir = MODEL_PATHS.get(model_name, MODEL_PATHS['distilbert'])
+
+        # Check if model files exist locally
+        if not os.path.isdir(load_dir) or not any(f.endswith(('.bin', '.safetensors')) for f in os.listdir(load_dir) if os.path.isfile(os.path.join(load_dir, f))):
+            raise FileNotFoundError(
+                f'Model "{model_name}" not found locally. '
+                f'Please click "Update Model" in the Phishing URL Analyser to download it from cloud storage.'
+            )
+        if model_name == 'mobilebert':
+            tokenizer = MobileBertTokenizer.from_pretrained(load_dir)
+            model = MobileBertForSequenceClassification.from_pretrained(
+                load_dir, device_map=None, low_cpu_mem_usage=False
+            )
+        else:
+            tokenizer = DistilBertTokenizer.from_pretrained(load_dir)
+            model = DistilBertForSequenceClassification.from_pretrained(
+                load_dir, device_map=None, low_cpu_mem_usage=False
+            )
+        model.eval()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.to(device)
+        _model_cache[model_name] = (tokenizer, model, device)
+        print(f"[Model] {model_name} loaded and cached.")
+        return tokenizer, model, device
+
+def invalidate_model_cache(model_name=None):
+    """Clear cached model(s) — call after FL training updates model weights."""
+    with _model_lock:
+        if model_name:
+            _model_cache.pop(model_name, None)
+            print(f"[Model] Cache cleared for {model_name}.")
+        else:
+            _model_cache.clear()
+            print("[Model] All model caches cleared.")
 
 # --- Phishing Detection Feature Functions ---
 def extract_url_features(url):
@@ -152,20 +264,22 @@ def clean_response(response_text):
     """
     Removes common conversational turn indicators (like "Human:", "Question:", "User:", "Answer:")
     and separator lines (e.g., "----------------------") from the generated response.
+    Also strips standalone stop words like "Human" or "User" at the end of the response.
     """
     # Remove the separator line if present
     cleaned_text = re.sub(r'-{5,}\s*', '', response_text, flags=re.IGNORECASE).strip()
-    # Remove patterns from the start, end, or after newlines
-    cleaned_text = re.sub(r'^(Human:|Question:|User:|Answer:)\s*', '', cleaned_text, flags=re.IGNORECASE).strip()
-    cleaned_text = re.sub(r'(Human:|Question:|User:|Answer:)\s*$', '', cleaned_text, flags=re.IGNORECASE).strip()
-    cleaned_text = re.sub(r'\n\s*(Human:|Question:|User:|Answer:)\s*', '\n', cleaned_text, flags=re.IGNORECASE).strip()
+    # Remove patterns from the start, end, or after newlines (with or without colon)
+    cleaned_text = re.sub(r'^(Human:?|Question:?|User:?|Answer:?|Assistant:?)\s*', '', cleaned_text, flags=re.IGNORECASE).strip()
+    cleaned_text = re.sub(r'\n\s*(Human:?|Question:?|User:?|Answer:?|Assistant:?)\s*', '\n', cleaned_text, flags=re.IGNORECASE).strip()
+    # Remove trailing stop words (with or without colon, possibly followed by whitespace)
+    cleaned_text = re.sub(r'\s*(Human:?|Question:?|User:?|Answer:?|Assistant:?)\s*$', '', cleaned_text, flags=re.IGNORECASE).strip()
     return cleaned_text
 
 # --- RAG Chatbot Initialization ---
 print("Initializing RAG Chatbot...")
 
 # 1. Load Q&A data from CSV
-csv_path = 'C:/Users/Yap Zheng Xian/Documents/Programming/Extension/cyber-extension/Knowledge Base/Knowledge Base.csv'
+csv_path = KB_CSV_PATH  # Use the same resolved path constant
 try:
     df = pd.read_csv(csv_path, encoding='utf-8')
     if 'question' not in df.columns or 'output' not in df.columns:
@@ -210,10 +324,29 @@ try:
     print("Tokenizer loaded.")
 
     class StopOnTokens(StoppingCriteria):
+        def __init__(self):
+            super().__init__()
+            self.stop_strings = ["Question:", "Human:", "User:", "Human", "User"]
+            # Encode each stop string and store all token IDs for matching
+            self.stop_token_sequences = []
+            self.stop_single_ids = set()
+            for s in self.stop_strings:
+                ids = tokenizer.encode(s, add_special_tokens=False)
+                if len(ids) == 1:
+                    self.stop_single_ids.add(ids[0])
+                self.stop_token_sequences.append(ids)
+
         def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
-            stop_strings = ["Question:", "Human:", "User:"]
-            stop_ids = [tokenizer.encode(s, add_special_tokens=False)[0] for s in stop_strings]
-            return input_ids[0][-1] in stop_ids
+            # Check single-token stops
+            if input_ids[0][-1].item() in self.stop_single_ids:
+                return True
+            # Check multi-token stop sequences
+            generated = input_ids[0].tolist()
+            for seq in self.stop_token_sequences:
+                if len(seq) > 1 and len(generated) >= len(seq):
+                    if generated[-len(seq):] == seq:
+                        return True
+            return False
 
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -607,12 +740,19 @@ def fl_train():
     if model_name not in MODEL_PATHS:
         return jsonify({'error': f'Unknown model: {model_name}'}), 400
 
+    # Wrapper that runs FL training then invalidates the model cache
+    def _fl_then_invalidate(train_fn, *args):
+        try:
+            train_fn(*args)
+        finally:
+            invalidate_model_cache(model_name)
+
     if mode == 'cloud':
         if not cloud_url:
             return jsonify({'error': 'cloud_url is required when mode=cloud'}), 400
         t = threading.Thread(
-            target=run_cloud_federated_training,
-            args=(cloud_url, model_name, num_rounds),
+            target=_fl_then_invalidate,
+            args=(run_cloud_federated_training, cloud_url, model_name, num_rounds),
             daemon=True,
         )
         t.start()
@@ -630,8 +770,8 @@ def fl_train():
         if not gcp_url:
             return jsonify({'error': 'gcp_url is required when mode=gcp'}), 400
         t = threading.Thread(
-            target=run_gcp_federated_training,
-            args=(gcp_url, model_name, num_rounds, api_key),
+            target=_fl_then_invalidate,
+            args=(run_gcp_federated_training, gcp_url, model_name, num_rounds, api_key),
             daemon=True,
         )
         t.start()
@@ -645,8 +785,8 @@ def fl_train():
 
     # Default: local simulation
     t = threading.Thread(
-        target=run_federated_training,
-        args=(model_name, num_rounds),
+        target=_fl_then_invalidate,
+        args=(run_federated_training, model_name, num_rounds),
         daemon=True,
     )
     t.start()
@@ -878,6 +1018,42 @@ def kb_restore():
         return jsonify({'status': 'restored', 'total': total})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# --- Model Update Endpoints ---
+
+@app.route('/model/update', methods=['POST'])
+def model_update():
+    """Start downloading the latest model from GCS in the background."""
+    global _model_update_status
+    with _model_update_lock:
+        if _model_update_status['state'] == 'downloading':
+            return jsonify({'status': 'already_running', 'message': 'Model update already in progress.'}), 409
+
+    data = request.get_json()
+    model_name = data.get('model', 'distilbert')
+    if model_name not in GCS_MODEL_PREFIXES:
+        return jsonify({'error': f'Unknown model: {model_name}'}), 400
+
+    _model_update_status.update({
+        'state': 'downloading',
+        'model': model_name,
+        'progress': 0,
+        'current_file': '',
+        'total_files': 0,
+        'completed_files': 0,
+        'error': None,
+    })
+
+    t = threading.Thread(target=_download_model_from_gcs, args=(model_name,), daemon=True)
+    t.start()
+    return jsonify({'status': 'started', 'model': model_name})
+
+
+@app.route('/model/update_status', methods=['GET'])
+def model_update_status():
+    """Poll model update progress."""
+    return jsonify(_model_update_status)
 
 
 if __name__ == '__main__':

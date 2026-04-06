@@ -233,9 +233,21 @@ def run_federated_training(
 
         print(f"[FL] Saved updated {model_name} model to: {save_dir}")
 
+        # Clear used reports for this model from reported_data.json
+        try:
+            if os.path.isfile(REPORTED_DATA_PATH):
+                with open(REPORTED_DATA_PATH, "r", encoding="utf-8") as fh:
+                    all_reports = json.load(fh)
+                remaining = [r for r in all_reports if r.get("model") != model_name]
+                with open(REPORTED_DATA_PATH, "w", encoding="utf-8") as fh:
+                    json.dump(remaining, fh, indent=2)
+                print(f"[FL] Cleared {len(model_data)} {model_name} reports. {len(remaining)} reports remaining for other models.")
+        except Exception as e:
+            print(f"[FL] Warning: Failed to clear reports: {e}")
+
         result_msg = (
             f"Done — {num_rounds} rounds, {n_clients} clients, "
-            f"{len(model_data)} reports used."
+            f"{len(model_data)} reports used. Reports cleared."
         )
         _fl_status = {"state": "idle", "message": result_msg}
         return {
@@ -401,9 +413,21 @@ def run_cloud_federated_training(
                                      os.path.join(save_dir, fname))
                 print(f"[Cloud FL] Saved updated {model_name} to {save_dir}")
 
+                # Clear used reports for this model
+                try:
+                    if os.path.isfile(REPORTED_DATA_PATH):
+                        with open(REPORTED_DATA_PATH, "r", encoding="utf-8") as fh:
+                            all_reports = json.load(fh)
+                        remaining = [r for r in all_reports if r.get("model") != model_name]
+                        with open(REPORTED_DATA_PATH, "w", encoding="utf-8") as fh:
+                            json.dump(remaining, fh, indent=2)
+                        print(f"[Cloud FL] Cleared {len(model_data)} {model_name} reports.")
+                except Exception as e:
+                    print(f"[Cloud FL] Warning: Failed to clear reports: {e}")
+
                 result_msg = (
                     f"Cloud FL done — {num_rounds} rounds on Colab, "
-                    f"{len(model_data)} samples. Model updated locally."
+                    f"{len(model_data)} samples. Model updated locally. Reports cleared."
                 )
                 _fl_status = {"state": "idle", "message": result_msg}
                 return {
@@ -659,9 +683,21 @@ def run_gcp_federated_training(
                              os.path.join(save_dir, fname))
         print(f"[GCP FL] Saved updated model to {save_dir}")
 
+        # Clear used reports for this model
+        try:
+            if os.path.isfile(REPORTED_DATA_PATH):
+                with open(REPORTED_DATA_PATH, "r", encoding="utf-8") as fh:
+                    all_reports = json.load(fh)
+                remaining = [r for r in all_reports if r.get("model") != model_name]
+                with open(REPORTED_DATA_PATH, "w", encoding="utf-8") as fh:
+                    json.dump(remaining, fh, indent=2)
+                print(f"[GCP FL] Cleared {len(model_data)} {model_name} reports.")
+        except Exception as e:
+            print(f"[GCP FL] Warning: Failed to clear reports: {e}")
+
         result_msg = (
             f"GCP FL complete. {len(model_data)} samples contributed. "
-            f"Global model updated to version {ver_now}."
+            f"Global model updated to version {ver_now}. Reports cleared."
         )
         _fl_status = {"state": "idle", "message": result_msg}
         return {
