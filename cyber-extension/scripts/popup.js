@@ -1,3 +1,18 @@
+// --- Backend URL with fallback (Edge/Opera may block 127.0.0.1) ---
+const BACKEND_URLS = ['http://127.0.0.1:5000', 'http://localhost:5000'];
+
+async function backendFetch(path, options = {}) {
+  for (const base of BACKEND_URLS) {
+    try {
+      const res = await fetch(base + path, options);
+      return res;
+    } catch (e) {
+      console.warn(`[backendFetch] ${base}${path} failed:`, e.message);
+    }
+  }
+  throw new Error(`All backend URLs failed for ${path}`);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const toggleMain = document.getElementById('protectionToggle');
   const toggleURL = document.getElementById('protectionToggleURL');
@@ -9,6 +24,40 @@ document.addEventListener('DOMContentLoaded', () => {
   const contentSections = document.querySelectorAll('.content-section');
 
   let sidebarOpen = false;
+
+  // --- Theme Management ---
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+  function applyTheme(theme) {
+    if (theme === 'dark') {
+      document.body.setAttribute('data-theme', 'dark');
+    } else {
+      document.body.removeAttribute('data-theme');
+    }
+    if (themeToggleBtn) {
+      themeToggleBtn.textContent = theme === 'dark' ? 'Switch to Light' : 'Switch to Dark';
+    }
+    if (typeof Chart !== 'undefined') {
+      const isDark = theme === 'dark';
+      Chart.defaults.color = isDark ? '#a0a0b8' : '#666666';
+      Chart.defaults.borderColor = isDark ? '#252548' : '#e0e0e0';
+    }
+  }
+
+  chrome.storage.local.get(['themePreference'], (result) => {
+    applyTheme(result.themePreference || 'light');
+    loadDashboardData();
+  });
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+      const next = isDark ? 'light' : 'dark';
+      applyTheme(next);
+      chrome.storage.local.set({ themePreference: next });
+      loadDashboardData(); // Re-render charts with new theme
+    });
+  }
 
   hamburgerIcon.addEventListener('click', () => {
     if (sidebarOpen) {
@@ -97,6 +146,114 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- Update Model Button ---
+  const updateModelBtn = document.getElementById('update-model-btn');
+  const modelUpdateProgress = document.getElementById('model-update-progress');
+  const modelUpdateLabel = document.getElementById('model-update-label');
+  const modelUpdatePercent = document.getElementById('model-update-percent');
+  const modelUpdateBar = document.getElementById('model-update-bar');
+  const modelUpdateFile = document.getElementById('model-update-file');
+
+  let modelUpdatePollTimer = null;
+
+  function pollModelUpdateStatus() {
+    backendFetch('/model/update_status')
+      .then(r => r.json())
+      .then(status => {
+        if (status.state === 'downloading') {
+          modelUpdateProgress.style.display = 'block';
+          modelUpdateBar.style.width = status.progress + '%';
+          modelUpdatePercent.textContent = status.progress + '%';
+          modelUpdateLabel.textContent = `Downloading ${status.model} model... (${status.completed_files}/${status.total_files} files)`;
+          modelUpdateFile.textContent = status.current_file ? `Current: ${status.current_file}` : '';
+          modelUpdateBtn.disabled = true;
+          modelUpdateBtn.textContent = 'Updating...';
+          modelUpdateBtn.style.backgroundColor = '#999';
+        } else if (status.state === 'done') {
+          modelUpdateBar.style.width = '100%';
+          modelUpdateBar.style.background = 'linear-gradient(90deg, #4caf50, #388e3c)';
+          modelUpdatePercent.textContent = '100%';
+          modelUpdateLabel.textContent = `${status.model} model updated successfully!`;
+          modelUpdateLabel.style.color = '#2e7d32';
+          modelUpdateFile.textContent = '';
+          modelUpdateBtn.disabled = false;
+          modelUpdateBtn.textContent = 'Update Model';
+          modelUpdateBtn.style.backgroundColor = '#ff9800';
+          clearInterval(modelUpdatePollTimer);
+          modelUpdatePollTimer = null;
+          // Hide progress after 5 seconds
+          setTimeout(() => {
+            modelUpdateProgress.style.display = 'none';
+            modelUpdateBar.style.background = 'linear-gradient(90deg, #ff9800, #f57c00)';
+            modelUpdateLabel.style.color = '#333';
+          }, 5000);
+        } else if (status.state === 'error') {
+          modelUpdateBar.style.width = '100%';
+          modelUpdateBar.style.background = '#f44336';
+          modelUpdatePercent.textContent = 'Error';
+          modelUpdateLabel.textContent = `Update failed: ${status.error}`;
+          modelUpdateLabel.style.color = '#c62828';
+          modelUpdateFile.textContent = '';
+          modelUpdateBtn.disabled = false;
+          modelUpdateBtn.textContent = 'Retry Update';
+          modelUpdateBtn.style.backgroundColor = '#f44336';
+          clearInterval(modelUpdatePollTimer);
+          modelUpdatePollTimer = null;
+        } else {
+          // idle — stop polling
+          clearInterval(modelUpdatePollTimer);
+          modelUpdatePollTimer = null;
+        }
+      })
+      .catch(err => {
+        console.warn('[ModelUpdate] Poll error:', err);
+      });
+  }
+
+  if (updateModelBtn) {
+    updateModelBtn.addEventListener('click', () => {
+      const selectedModel = modelSelect ? modelSelect.value : 'distilbert';
+      updateModelBtn.disabled = true;
+      updateModelBtn.textContent = 'Starting...';
+      updateModelBtn.style.backgroundColor = '#999';
+
+      // Reset progress bar appearance
+      modelUpdateProgress.style.display = 'block';
+      modelUpdateBar.style.width = '0%';
+      modelUpdateBar.style.background = 'linear-gradient(90deg, #ff9800, #f57c00)';
+      modelUpdatePercent.textContent = '0%';
+      modelUpdateLabel.textContent = 'Connecting to cloud storage...';
+      modelUpdateLabel.style.color = '#333';
+      modelUpdateFile.textContent = '';
+
+      backendFetch('/model/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: selectedModel }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'already_running') {
+            modelUpdateLabel.textContent = 'Update already in progress...';
+          }
+          // Start polling for progress
+          if (!modelUpdatePollTimer) {
+            modelUpdatePollTimer = setInterval(pollModelUpdateStatus, 1000);
+          }
+        })
+        .catch(err => {
+          modelUpdateLabel.textContent = `Failed to start: ${err.message}`;
+          modelUpdateLabel.style.color = '#c62828';
+          modelUpdateBar.style.background = '#f44336';
+          modelUpdateBar.style.width = '100%';
+          modelUpdatePercent.textContent = 'Error';
+          updateModelBtn.disabled = false;
+          updateModelBtn.textContent = 'Retry Update';
+          updateModelBtn.style.backgroundColor = '#f44336';
+        });
+    });
+  }
+
   // Initialize the popup's UI based on stored state
   chrome.storage.local.get(['protectionEnabled', 'warningEnabled', 'urlScanningEnabled', 'analysisResult'], (data) => {
     var protectionOn = !!data.protectionEnabled;
@@ -173,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const model   = modelSelect ? modelSelect.value : 'distilbert';
 
             // Call /predict directly from popup (avoids message-passing issues)
-            fetch('http://127.0.0.1:5000/predict', {
+            backendFetch('/predict', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ url: pageUrl, model }),
@@ -288,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // 1. Fetch descriptions from our backend
           let descriptions = {};
           try {
-            const response = await fetch('http://127.0.0.1:5000/analyze-cookies', {
+            const response = await backendFetch('/analyze-cookies', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ domain: domain })
@@ -395,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Dashboard Logic ---
   let threatChartInstance = null;
   let percentageChartInstance = null;
+  let riskScoreChartInstance = null;
   let fullScanHistory = [];
 
   function loadDashboardData() {
@@ -427,10 +585,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check if history exists
     if (!history || history.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px;">No activity recorded yet. Browse websites to generate data.</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 15px; color: var(--text-muted);">No activity recorded yet. Browse websites to generate data.</td></tr>';
       document.getElementById('total-scanned').textContent = 0;
       document.getElementById('phishing-detected').textContent = 0;
       document.getElementById('legitimate-sites').textContent = 0;
+      const rateEl = document.getElementById('detection-rate');
+      if (rateEl) rateEl.textContent = '0%';
+      const scoreEl = document.getElementById('risk-score-value');
+      if (scoreEl) scoreEl.textContent = '0';
+      const levelEl = document.getElementById('risk-score-level');
+      if (levelEl) { levelEl.textContent = 'Low'; levelEl.style.background = '#2ecc71'; levelEl.style.color = 'white'; }
     } else {
       // Sort history by timestamp descending (newest first)
       const reversedHistory = [...history].reverse();
@@ -498,11 +662,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = new Date((entry.timestamp || Date.now()) * 1000);
         const originalIndex = history.length - 1 - index; // Calculate index in original array
         row.innerHTML = `
-          <td style="padding: 8px; border-bottom: 1px solid #000000;">${date.toLocaleString()}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #000000; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${urlDisplay}">${urlDisplay}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #000000; color: ${isPhishing ? '#d9534f' : '#038303'}; font-weight: bold;">${label}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #000000;">${confidenceDisplay}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #000000; text-align: center;">
+          <td>${date.toLocaleString()}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${urlDisplay}">${urlDisplay}</td>
+          <td style="color: ${isPhishing ? '#ff4757' : '#2ecc71'}; font-weight: bold;">${label}</td>
+          <td>${confidenceDisplay}</td>
+          <td>
             <img src="images/trash.png" class="delete-history-btn" data-index="${originalIndex}" width="20" style="cursor: pointer;" title="Delete Record">
           </td>
         `;
@@ -521,6 +685,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('total-scanned').textContent = total;
       document.getElementById('phishing-detected').textContent = phishing;
       document.getElementById('legitimate-sites').textContent = legitimate;
+
+      // Update Detection Rate
+      const rateEl = document.getElementById('detection-rate');
+      if (rateEl) {
+        rateEl.textContent = total > 0 ? ((phishing / total) * 100).toFixed(1) + '%' : '0%';
+      }
 
       // Update Comparison Metrics
       updateComparison('total-change', todayStats.total, yestStats.total, false);
@@ -623,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctxPercentage = document.getElementById('percentageChart');
     if (ctxPercentage) {
       if (percentageChartInstance) percentageChartInstance.destroy();
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
 
       const hasData = (phishing + legitimate) > 0;
       percentageChartInstance = new Chart(ctxPercentage, {
@@ -630,18 +801,66 @@ document.addEventListener('DOMContentLoaded', () => {
         data: {
           labels: ['Phishing', 'Legitimate'],
           datasets: [{
-            data: hasData ? [phishing, legitimate] : [0, 0],
-            backgroundColor: hasData ? ['#d9534f', '#5cb85c'] : ['#e0e0e0', '#e0e0e0'],
-            borderWidth: 1,
-            cutout: '60%'
+            data: hasData ? [phishing, legitimate] : [1],
+            backgroundColor: hasData ? ['#ff4757', '#2ecc71'] : [isDark ? '#252548' : '#e0e0e0'],
+            borderWidth: 0,
+            cutout: '65%'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          circumference: 180,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: isDark ? '#a0a0b8' : '#666', padding: 16, usePointStyle: true } },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  const t = phishing + legitimate;
+                  const pct = t > 0 ? ((ctx.raw / t) * 100).toFixed(1) : 0;
+                  return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 3. Risk Score Chart (Gauge)
+    const riskCtx = document.getElementById('riskScoreChart');
+    if (riskCtx && typeof Chart !== 'undefined') {
+      if (riskScoreChartInstance) riskScoreChartInstance.destroy();
+      const isDark = document.body.getAttribute('data-theme') === 'dark';
+
+      const score = total > 0 ? Math.round((phishing / total) * 1000) : 0;
+      const level = score <= 250 ? 'Low' : score <= 500 ? 'Medium' : score <= 750 ? 'High' : 'Critical';
+      const gaugeColor = score <= 250 ? '#2ecc71' : score <= 500 ? '#f39c12' : score <= 750 ? '#ff6b35' : '#ff4757';
+
+      const scoreEl = document.getElementById('risk-score-value');
+      const levelEl = document.getElementById('risk-score-level');
+      if (scoreEl) scoreEl.textContent = score;
+      if (levelEl) {
+        levelEl.textContent = level;
+        levelEl.style.background = gaugeColor;
+        levelEl.style.color = 'white';
+      }
+
+      riskScoreChartInstance = new Chart(riskCtx, {
+        type: 'doughnut',
+        data: {
+          datasets: [{
+            data: [score, 1000 - score],
+            backgroundColor: [gaugeColor, isDark ? '#1a1a3e' : '#e8e8e8'],
+            borderWidth: 0,
+            cutout: '78%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
           rotation: -90,
-          plugins: { legend: { position: 'bottom' } }
+          circumference: 360,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } }
         }
       });
     }
@@ -659,7 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.addEventListener('click', (e) => {
-      if (filterMenu.style.display === 'block' && !filterMenu.contains(e.target) && e.target !== filterBtn) {
+      if (filterMenu.style.display === 'block' && !filterMenu.contains(e.target) && !filterBtn.contains(e.target)) {
         filterMenu.style.display = 'none';
       }
     });
@@ -749,7 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('kb-tbody');
     if (!tbody) return;
     if (!rows || rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No entries found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">No entries found.</td></tr>';
       return;
     }
     tbody.innerHTML = '';
@@ -772,9 +991,9 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', async () => {
         const idx = parseInt(btn.dataset.index);
         if (!confirm(`Delete entry #${idx + 1}?`)) return;
-        setKbStatus('Deleting…', '#555');
+        setKbStatus('Deleting...', '#555');
         try {
-          const res = await fetch('http://127.0.0.1:5000/kb/delete', {
+          const res = await backendFetch('/kb/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ index: idx }),
@@ -794,9 +1013,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function loadKbRows() {
-    setKbStatus('Loading…', '#555');
+    setKbStatus('Loading...', '#555');
     try {
-      const res = await fetch('http://127.0.0.1:5000/kb/rows');
+      const res = await backendFetch('/kb/rows');
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       renderKbTable(data.rows);
@@ -817,9 +1036,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setKbStatus('Please fill in both Question and Answer.', '#d9534f');
         return;
       }
-      setKbStatus('Adding entry…', '#555');
+      setKbStatus('Adding entry...', '#555');
       try {
-        const res = await fetch('http://127.0.0.1:5000/kb/add', {
+        const res = await backendFetch('/kb/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question, output }),
@@ -844,9 +1063,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (kbRebuildBtn) {
     kbRebuildBtn.addEventListener('click', async () => {
       kbRebuildBtn.disabled = true;
-      setKbStatus('Rebuilding Vector DB…', '#2196F3');
+      setKbStatus('Rebuilding Vector DB...', '#2196F3');
       try {
-        const res = await fetch('http://127.0.0.1:5000/kb/rebuild', { method: 'POST' });
+        const res = await backendFetch('/kb/rebuild', { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
           setKbStatus(`Vector DB rebuilt with ${data.total} entries.`, '#5cb85c');
@@ -870,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Never scanned
     if (!scanData) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No scan data yet. Scan a page to see results.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">No scan data yet. Scan a page to see results.</td></tr>';
       if (meta) meta.textContent = '';
       return;
     }
@@ -879,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Scanned but page had no outgoing HTTP links
     if (!scanData.results || scanData.results.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:#888;">No HTTP links found on this page.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">No HTTP links found on this page.</td></tr>';
       if (meta) meta.textContent = `Last scanned: ${ts} — 0 URLs found`;
       return;
     }
@@ -892,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = document.createElement('tr');
       row.style.backgroundColor = isPhishing ? 'rgba(217,83,79,0.12)' : 'rgba(92,184,92,0.10)';
       row.innerHTML = `
-        <td style="padding:7px 10px; border-bottom:1px solid #ddd; color:#555;">${idx + 1}</td>
+        <td style="padding:7px 10px; border-bottom:1px solid #ddd; color: var(--text-secondary);">${idx + 1}</td>
         <td style="padding:7px 10px; border-bottom:1px solid #ddd; max-width:300px;">
           <div style="display:flex; align-items:center; gap:6px;">
             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.url}">${item.url}</span>
@@ -935,9 +1154,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (batchScanPageBtn) {
     batchScanPageBtn.addEventListener('click', () => {
       batchScanPageBtn.disabled = true;
-      batchScanPageBtn.textContent = 'Scanning…';
+      batchScanPageBtn.textContent = 'Scanning...';
       const meta = document.getElementById('batch-scan-meta');
-      if (meta) meta.textContent = 'Fetching and analysing all page links…';
+      if (meta) meta.textContent = 'Fetching and analysing all page links...';
 
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         if (!tabs.length || !tabs[0].url) {
@@ -950,7 +1169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const model   = modelSelect ? modelSelect.value : 'distilbert';
 
         try {
-          const res = await fetch('http://127.0.0.1:5000/scan_page', {
+          const res = await backendFetch('/scan_page', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ url: pageUrl, model }),
@@ -981,9 +1200,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (scanPageBtn) {
     scanPageBtn.addEventListener('click', () => {
       scanPageBtn.disabled = true;
-      scanPageBtn.textContent = 'Scanning…';
+      scanPageBtn.textContent = 'Scanning...';
       const meta = document.getElementById('batch-scan-meta');
-      if (meta) meta.textContent = 'Analysing current page URL…';
+      if (meta) meta.textContent = 'Analysing current page URL...';
 
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         if (!tabs.length || !tabs[0].url) {
@@ -996,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const model   = modelSelect ? modelSelect.value : 'distilbert';
 
         try {
-          const res = await fetch('http://127.0.0.1:5000/predict', {
+          const res = await backendFetch('/predict', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ url: pageUrl, model }),
@@ -1046,8 +1265,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Load dashboard data initially if dashboard is the default view
-  loadDashboardData();
   // Pre-load batch scan data so it's ready when user switches to Analyse URL tab
   loadBatchScanResults();
 
@@ -1064,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchReportCount(modelName) {
     try {
-      const res = await fetch(`http://127.0.0.1:5000/report_count?model=${modelName}`);
+      const res = await backendFetch(`/report_count?model=${modelName}`);
       if (res.ok) {
         const data = await res.json();
         if (flReportCount) flReportCount.textContent = data.count;
@@ -1076,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchFlStatus() {
     try {
-      const res = await fetch('http://127.0.0.1:5000/fl_status');
+      const res = await backendFetch('/fl_status');
       if (!res.ok) return;
       const data = await res.json();
       if (flStatusDisplay) {
@@ -1119,10 +1336,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      if (reportStatus) { reportStatus.textContent = 'Submitting…'; reportStatus.style.color = '#555'; }
+      if (reportStatus) { reportStatus.textContent = 'Submitting...'; reportStatus.style.color = '#555'; }
 
       try {
-        const res = await fetch('http://127.0.0.1:5000/report', {
+        const res = await backendFetch('/report', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ url, model, label }),
@@ -1184,8 +1401,8 @@ document.addEventListener('DOMContentLoaded', () => {
       flTrainBtn.disabled = true;
       if (flStatusDisplay) {
         flStatusDisplay.textContent = mode === 'gcp'
-          ? `Connecting to GCP server…`
-          : 'Starting local training…';
+          ? `Connecting to GCP server...`
+          : 'Starting local training...';
         flStatusDisplay.style.color = '#2196F3';
       }
 
@@ -1193,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = { model, rounds: 3, mode };
         if (mode === 'gcp') { body.gcp_url = gcpUrl; body.api_key = apiKey; }
 
-        const res = await fetch('http://127.0.0.1:5000/fl_train', {
+        const res = await backendFetch('/fl_train', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(body),
@@ -1203,8 +1420,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res.ok) {
           if (flStatusDisplay) {
             flStatusDisplay.textContent = mode === 'gcp'
-              ? `GCP FL started — uploading adapter, waiting for aggregation…`
-              : `Local training started (${data.rounds} rounds)…`;
+              ? `GCP FL started — uploading adapter, waiting for aggregation...`
+              : `Local training started (${data.rounds} rounds)...`;
             flStatusDisplay.style.color = '#2196F3';
           }
           if (_flPolling) clearInterval(_flPolling);
@@ -1349,7 +1566,7 @@ function addMessageToLog(role, content) {
 
 // StarCoder2 via local Flask
 async function sendToStarcoder(userInput) {
-  const response = await fetch('http://127.0.0.1:5000/chat', {
+  const response = await backendFetch('/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: userInput, history: chatHistory, audit_only: auditOnlyToggle.checked }),
@@ -1428,7 +1645,7 @@ async function handleSendMessage() {
   const model = chatModelSelect.value;
   const thinkingEl = document.createElement('div');
   thinkingEl.classList.add('bot-message');
-  thinkingEl.innerHTML = '<div class="message-content" style="color:#888; font-style:italic;">Thinking…</div>';
+  thinkingEl.innerHTML = '<div class="message-content" style="color: var(--text-muted); font-style:italic;">Thinking...</div>';
   chatLog.appendChild(thinkingEl);
   chatLog.scrollTop = chatLog.scrollHeight;
 
