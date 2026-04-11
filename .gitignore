@@ -1,0 +1,35 @@
+# Model weights (download separately)
+model/**/*.bin
+model/**/*.safetensors
+model/**/*.h5
+model/**/*.onnx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Vector DB (rebuilt at startup)
+Knowledge Base/RAGData_Backend/
+
+# Reports (generated at runtime)
+python-backend/reported_data.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Credentials (never commit)
+*.json
+!manifest.json
+!package.json
+!Knowledge Base/*.json
+credentials/
+service-account*.json

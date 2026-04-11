@@ -1,0 +1,1102 @@
+<style>
+      /* ===== Theme Variables ===== */
+      :root {
+        --bg-body: #ebeca5;
+        --bg-topnav: #c7cef7;
+        --bg-sidebar: #f8d2ff;
+        --bg-card: #ffffff;
+        --bg-input: #f0f0f0;
+        --text-primary: #000000;
+        --text-secondary: #555555;
+        --text-muted: #888888;
+        --border-color: #cccccc;
+        --shadow-card: 0 2px 4px rgba(0,0,0,0.1);
+        --sidebar-link: #251010;
+        --sidebar-hover: #818181;
+        --table-header: #c7cef7;
+      }
+      [data-theme="dark"] {
+        --bg-body: #080818;
+        --bg-topnav: #0e0e28;
+        --bg-sidebar: #0e0e28;
+        --bg-card: #12122e;
+        --bg-input: #1a1a3e;
+        --text-primary: #e4e4f0;
+        --text-secondary: #a0a0b8;
+        --text-muted: #8c8cca;
+        --border-color: #252548;
+        --shadow-card: 0 4px 16px rgba(0,0,0,0.5);
+        --sidebar-link: #c8c8e0;
+        --sidebar-hover: #a0a0db;
+        --table-header: #1a1a3e;
+      }
+      body{
+        font-family: "Courier New", Courier, monospace;
+        font-size:18px;
+        min-width:600px;
+        min-height: 750px;
+        padding-top: 50px;
+        margin: 0px;
+        background-color: var(--bg-body);
+        color: var(--text-primary);
+        border-radius: 30px;
+        overflow: auto;
+        transition: background-color 0.3s, color 0.3s;
+      }
+      #resize-handle {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 25px;
+        height: 25px;
+        background-color: #88888800;
+        cursor: se-resize;
+        z-index: 10;
+        border-top: 0px solid #fff;
+        border-left: 0px solid #fff;
+      }
+      #top-nav {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        background-color: var(--bg-topnav);
+        color: var(--text-primary);
+        transition: background-color 0.3s, color 0.3s;
+        position: fixed;
+        width: 100%;
+        top:0;
+        z-index: 2;
+      }
+      #hamburger-icon {
+        cursor: pointer;
+        margin-right: 20px;
+      }
+      #container{
+        display: flex;
+        margin-top: 60px; /* Height of the top nav */
+      }
+      #sidebar {
+        height: calc(100% - 60px); /* Adjust height for top nav */
+        width: 80px;
+        position: fixed;
+        z-index: 1;
+        top: 60px; /* Position below top nav */
+        left: 0;
+        background-color: var(--bg-sidebar);
+        transition: background-color 0.3s, width 0.5s;
+        overflow-x: hidden;
+        transition: 0.5s;
+        box-sizing: border-box;
+        padding-top: 30px;
+      }
+      #sidebar ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        word-break: break-all;
+      }
+      #sidebar a {
+        padding: 8px 8px 8px 32px;
+        text-decoration: none;
+        font-size: 20px;
+        color: var(--sidebar-link);
+        display: flex;
+        align-items: center;
+        transition: 0.3s;
+        white-space: nowrap;
+      }
+      #sidebar a img {
+        margin-right: 15px;
+        padding-right:20px;
+      }
+      #sidebar a:hover {
+        color: var(--sidebar-hover);
+      }
+      #sidebar.sidebar-open a {
+        white-space: normal;
+      }
+      #main-content {
+        transition: margin-left .5s;
+        padding: 16px;
+        flex-grow: 1;
+      }
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+      }
+      input:checked + .slider {
+        background-color: #2196F3;
+      }
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+      .slider.round {
+        border-radius: 34px;
+      }
+      .slider.round:before {
+        border-radius: 50%;
+      }
+      #status {
+        margin-top: 10px;
+        font-style: italic;
+      }
+      .info {
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      #confidence {
+        margin-top: 10px;
+        font-weight: bold;
+        color: var(--text-primary);
+      }
+      .chatInput{
+        border-radius: 100px;
+      }
+      .cookie-card {
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+      }
+      .cookie-header {
+        background-color: #84dcf7;
+        padding: 10px;
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+      }
+      .cookie-body {
+        padding: 10px;
+      }
+      .cookie-row {
+        margin-bottom: 5px;
+        word-break: break-all;
+      }
+      .content-section {
+        margin-left: 80px;
+        transition: margin-left 0.5s;
+        max-width: calc(100% - 80px);
+        box-sizing: border-box;
+        overflow-x: hidden;
+      }
+      /* Chatbox Styles */
+      .chat-log {
+        height: 350px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        background-color: #fff;
+        border-radius: 5px;
+      }
+      .chat-log .user-message, .chat-log .bot-message {
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+      }
+      .chat-log .user-message { justify-content: flex-end; }
+      .chat-log .bot-message { justify-content: flex-start; }
+
+      /* Add icons using pseudo-elements */
+      .chat-log .bot-message::before {
+        content: "";
+        width: 30px;
+        height: 30px;
+        background-image: url('images/bot_icon.png');
+        background-size: cover;
+        border-radius: 50%;
+        margin-right: 10px;
+        flex-shrink: 0;
+      }
+      .chat-log .user-message::after {
+        content: "";
+        width: 30px;
+        height: 30px;
+        background-image: url('images/user_icon.png');
+        background-size: cover;
+        border-radius: 50%;
+        margin-left: 10px;
+        flex-shrink: 0;
+      }
+      
+      .chat-log .message-content {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 15px;
+        max-width: 80%;
+        word-wrap: break-word;
+        white-space: pre-wrap; /* This will make the browser render newline characters */
+      }
+      .user-message .message-content { 
+        background-color: #dcf8c6; 
+      }
+      .bot-message .message-content { 
+        background-color: #89ecc3; 
+        border: 1px solid #20e281;
+      }
+      .chat-input-area { display: flex; gap: 10px; }
+      #chatInput {
+        flex-grow: 1;
+      }
+      /* ===== Dashboard Redesign ===== */
+      .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+      .dash-header h2 { margin: 0; }
+      .theme-toggle {
+        background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary);
+        padding: 8px 18px; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 13px;
+        display: flex; align-items: center; gap: 8px; transition: all 0.3s;
+      }
+      .theme-toggle:hover { border-color: var(--text-secondary); background: var(--bg-input); }
+      .dash-top-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin-bottom: 20px; }
+      .dash-card {
+        background: var(--bg-card); border-radius: 16px; padding: 20px;
+        box-shadow: var(--shadow-card); border: 1px solid var(--border-color);
+        transition: background-color 0.3s, border-color 0.3s;
+      }
+      .dash-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+      .dash-section-header h3 { margin: 0; font-size: 16px; }
+      .dash-badge {
+        background: var(--bg-input); border: 1px solid var(--border-color); padding: 4px 12px;
+        border-radius: 6px; font-size: 12px; color: var(--text-secondary);
+      }
+      .dash-metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .dash-metric-card {
+        display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px;
+        background: var(--bg-input); border: 1px solid var(--border-color); transition: background-color 0.3s;
+      }
+      .dash-metric-icon {
+        width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+        justify-content: center; flex-shrink: 0; font-size: 20px; color: white;
+      }
+      .dash-metric-info { min-width: 0; }
+      .dash-metric-value { font-size: 22px; font-weight: 700; margin: 0; line-height: 1.2; }
+      .dash-metric-value.phishing-val { color: #ff4757; }
+      .dash-metric-value.legit-val { color: #2ecc71; }
+      .dash-metric-label { font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0; white-space: nowrap; }
+      .dash-metric-change { font-size: 11px; font-weight: 600; margin: 2px 0 0 0; }
+      .dash-risk-score-card { display: flex; flex-direction: column; }
+      .dash-risk-gauge {
+        position: relative; width: 180px; height: 100px; margin: 0 auto; overflow: hidden;
+      }
+      .dash-risk-gauge canvas { width: 180px !important; height: 180px !important; }
+      .dash-risk-label {
+        position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); text-align: center;
+      }
+      .dash-risk-number { display: block; font-size: 30px; font-weight: 700; line-height: 1; }
+      .dash-risk-level {
+        display: inline-block; font-size: 11px; font-weight: 600; margin-top: 3px;
+        padding: 2px 12px; border-radius: 12px;
+      }
+      .dash-risk-ranges {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px;
+        margin: 10px auto 0; max-width: 210px;
+      }
+      .dash-risk-range-item {
+        display: flex; align-items: center; gap: 6px; font-size: 11px; padding: 2px 0;
+      }
+      .dash-risk-dot {
+        width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      }
+      .dash-risk-range-label { font-weight: 600; }
+      .dash-risk-range-val { opacity: 0.65; font-size: 10px; }
+      .dash-charts-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; margin-bottom: 20px; }
+      .dash-chart-body { flex-grow: 1; position: relative; min-height: 0; height: 220px; }
+      .dash-doughnut-body { display: flex; align-items: center; justify-content: center; }
+      .dash-filter-btn {
+        display: flex; align-items: center; gap: 6px; background: var(--bg-input);
+        border: 1px solid var(--border-color); color: var(--text-secondary);
+        padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;
+      }
+      .dash-filter-btn:hover { border-color: var(--text-secondary); }
+      .dash-table-card { margin-bottom: 20px; }
+      .dash-table-wrapper { overflow-x: auto; max-height: 300px; }
+      .dash-table { width: 100%; border-collapse: collapse; }
+      .dash-table thead tr { background: var(--table-header); position: sticky; top: 0; }
+      .dash-table th {
+        padding: 10px 12px; text-align: left; font-size: 13px; font-weight: 600;
+        color: var(--text-secondary); border-bottom: 1px solid var(--border-color);
+      }
+      .dash-table th:last-child { text-align: center; }
+      .dash-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border-color); }
+      .dash-table td:last-child { text-align: center; }
+      .dash-btn-danger {
+        background: #d9534f; color: white; border: none; padding: 6px 14px; border-radius: 6px;
+        cursor: pointer; font-weight: 600; font-size: 13px; font-family: inherit;
+      }
+      .dash-btn-danger:hover { background: #c9302c; }
+      .filter-option {
+        padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 13px; color: var(--text-primary);
+      }
+      .filter-option:hover { background: var(--bg-input); }
+
+      /* ===== Aesthetic Button Styles ===== */
+      button, .btn {
+        position: relative;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 22px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        overflow: hidden;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+        letter-spacing: 0.3px;
+      }
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.12);
+      }
+      button:active {
+        transform: translateY(0px) scale(0.97);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        transition-duration: 0.1s;
+      }
+      button:focus-visible {
+        outline: 3px solid rgba(33, 150, 243, 0.5);
+        outline-offset: 2px;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+        filter: grayscale(0.3);
+      }
+      /* Ripple effect on click */
+      button::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+        opacity: 0;
+      }
+      button:active::after {
+        width: 200px;
+        height: 200px;
+        opacity: 1;
+        transition: 0s;
+      }
+
+      /* ===== Aesthetic Select / Dropdown Styles ===== */
+      select {
+        appearance: none;
+        -webkit-appearance: none;
+        background-color: var(--bg-card);
+        color: var(--text-primary);
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        padding: 9px 38px 9px 14px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+      }
+      select:hover {
+        border-color: #2196F3;
+        box-shadow: 0 2px 8px rgba(33, 150, 243, 0.15);
+      }
+      select:focus {
+        outline: none;
+        border-color: #2196F3;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2), 0 2px 8px rgba(33, 150, 243, 0.12);
+      }
+      select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* ===== Aesthetic Input / Textarea Styles ===== */
+      input[type="text"],
+      input[type="password"],
+      input[type="url"],
+      input[type="date"],
+      input[type="number"],
+      textarea {
+        background-color: var(--bg-card);
+        color: var(--text-primary);
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-family: inherit;
+        font-size: 14px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+      }
+      input[type="text"]:hover,
+      input[type="password"]:hover,
+      input[type="url"]:hover,
+      input[type="date"]:hover,
+      input[type="number"]:hover,
+      textarea:hover {
+        border-color: #999;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.04), 0 1px 4px rgba(0,0,0,0.06);
+      }
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      input[type="url"]:focus,
+      input[type="date"]:focus,
+      input[type="number"]:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #2196F3;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2), inset 0 1px 3px rgba(0,0,0,0.04);
+      }
+      input::placeholder, textarea::placeholder {
+        color: var(--text-muted);
+        opacity: 0.7;
+      }
+      input:disabled, textarea:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background-color: var(--bg-input);
+      }
+
+      /* ===== Toggle Switch Enhancement ===== */
+      .switch input:focus-visible + .slider {
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
+      }
+      .slider {
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+      }
+      input:checked + .slider {
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 8px rgba(33, 150, 243, 0.3);
+      }
+      .slider:before {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+
+      /* ===== Theme Toggle Button Override ===== */
+      .theme-toggle {
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      }
+      .theme-toggle:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      }
+      .theme-toggle:active {
+        transform: translateY(0) scale(0.97);
+      }
+
+      /* ===== Dashboard Button Overrides ===== */
+      .dash-btn-danger {
+        box-shadow: 0 2px 6px rgba(217,83,79,0.3);
+      }
+      .dash-btn-danger:hover {
+        background: #c9302c;
+        box-shadow: 0 4px 12px rgba(217,83,79,0.4);
+      }
+      .dash-filter-btn {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .dash-filter-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      }
+
+      /* ===== Table Enhancements ===== */
+      #batch-scan-table tbody tr,
+      #kb-table tbody tr,
+      .dash-table tbody tr {
+        transition: background-color 0.15s ease;
+      }
+      #batch-scan-table tbody tr:hover,
+      #kb-table tbody tr:hover,
+      .dash-table tbody tr:hover {
+        background-color: rgba(33, 150, 243, 0.06);
+      }
+
+      /* ===== Card Hover Effect ===== */
+      .dash-card {
+        transition: background-color 0.3s, border-color 0.3s, box-shadow 0.25s, transform 0.25s;
+      }
+      .dash-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+      }
+
+      /* ===== Info Box Enhancement ===== */
+      .info {
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        background: var(--bg-card);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        transition: border-color 0.25s, box-shadow 0.25s;
+      }
+
+      /* ===== Dark mode overrides for other sections ===== */
+      [data-theme="dark"] .info { border-color: var(--border-color); background: var(--bg-input); }
+      [data-theme="dark"] .cookie-card { background: var(--bg-card); border-color: var(--border-color); }
+      [data-theme="dark"] .cookie-header { background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary); }
+      [data-theme="dark"] .chat-log { background: var(--bg-card); border-color: var(--border-color); }
+      [data-theme="dark"] select,
+      [data-theme="dark"] input[type="text"],
+      [data-theme="dark"] input[type="password"],
+      [data-theme="dark"] input[type="url"],
+      [data-theme="dark"] input[type="date"],
+      [data-theme="dark"] input[type="number"],
+      [data-theme="dark"] textarea { background: var(--bg-input); color: var(--text-primary); border-color: var(--border-color); }
+      [data-theme="dark"] select {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a0b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      }
+      [data-theme="dark"] select:hover,
+      [data-theme="dark"] input[type="text"]:hover,
+      [data-theme="dark"] textarea:hover { border-color: #4a4a7a; }
+      [data-theme="dark"] select:focus,
+      [data-theme="dark"] input[type="text"]:focus,
+      [data-theme="dark"] textarea:focus { border-color: #5c6bc0; box-shadow: 0 0 0 3px rgba(92,107,192,0.25); }
+      [data-theme="dark"] button { box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+      [data-theme="dark"] button:hover { box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+      [data-theme="dark"] button::after { background: rgba(255,255,255,0.15); }
+      [data-theme="dark"] #batch-scan-table tbody tr:hover,
+      [data-theme="dark"] #kb-table tbody tr:hover,
+      [data-theme="dark"] .dash-table tbody tr:hover { background-color: rgba(92,107,192,0.1); }
+      [data-theme="dark"] .user-message .message-content { background: #1a3a2a; color: var(--text-primary); }
+      [data-theme="dark"] .bot-message .message-content { background: #0a2a3a; border-color: #1a4a5a; color: var(--text-primary); }
+      [data-theme="dark"] #batch-scan-table thead tr,
+      [data-theme="dark"] #kb-table thead tr { background: var(--table-header); }
+      [data-theme="dark"] #batch-scan-table th, [data-theme="dark"] #kb-table th,
+      [data-theme="dark"] #batch-scan-table td, [data-theme="dark"] #kb-table td { border-color: var(--border-color); }
+
+    </style>
+    <script src="scripts/chart.js"></script>
+  </head>
+  <body>
+    <div id="top-nav">
+      <div id="hamburger-icon">
+        <img src="images/hamburger icon.png" alt="Menu" width="30" style="padding-left: 20px;">
+      </div>
+      <img src="images/Hacker.png" width="75"></img>
+      <h2 style="padding-left: 20px; flex-grow: 1;">Cybersecurity Browser Extension</h2>
+      <button id="theme-toggle-btn" class="theme-toggle" title="Switch Theme" style="margin-right: 50px;">Switch to Dark</button>
+    </div>
+    <div id="container">
+      <div id="sidebar">
+        <ul>
+          <li id="dashboard-link" style="padding-top: 20px;"><a href="#"><img src="images/dashboard.png" width="30">Dashboard</a></li>
+          <li id="analyse-url-link"><a href="#"><img src="images/Analyse URL.png" width="30"> Analyse <br> URL</a></li>
+          <li id="website-auditing-link"><a href="#"><img src="images/Chatbot for website auditing.png" width="30">AI Powered <br> Website <br>Auditing</a></li>
+          <li id="knowledge-base-management-link"><a href="#"><img src="images/Knowledge Base.png" width="30">Knowledge <br> Base<br> Management</a></li>
+          <li id="malicious-content-analyser-link"><a href="#"><img src="images/mobile-app_1765888.png" width="30">Website <br> Content <br> Analyser</a></li>
+          <li id="cookies-analyzer-link"><a href="#"><img src="images/analyse cookies.png" width="30"> Cookies <br> Analyzer</a></li>
+          <li id="report-phishing-link"><a href="#"><img src="images/report issues.png" width="30">Report <br> Phishing <br>Website</a></li>
+        </ul>
+        <div style="padding: 10px 12px; border-top: 1px solid var(--border-color); margin-top: auto;">
+          <span style="font-size: 10px; color: var(--text-secondary);">Backend: Local (localhost:5000)</span>
+        </div>
+      </div>
+
+      <div id="dashboard-content" class="content-section" style="padding: 16px; flex-grow: 1; padding-left:40px; padding-right:30px;">
+        <!-- Dashboard Header -->
+        <div class="dash-header">
+          <h2 style="margin-top:20px;">Cybersecurity Dashboard</h2>
+        </div>
+
+        <!-- Top Row: Metrics + Risk Score -->
+        <div class="dash-top-row">
+          <!-- Current Risk Section -->
+          <div class="dash-card">
+            <div class="dash-section-header">
+              <h3>Current Risk</h3>
+              <span class="dash-badge">Daily</span>
+            </div>
+            <div class="dash-metrics-grid">
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #ff9a56, #ff6b35);">&#9678;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value" id="total-scanned">0</p>
+                  <p class="dash-metric-label">Total Scanned</p>
+                  <p class="dash-metric-change" id="total-change"></p>
+                </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #ff4757, #c0392b);">&#9888;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value phishing-val" id="phishing-detected">0</p>
+                  <p class="dash-metric-label">Phishing Found</p>
+                  <p class="dash-metric-change" id="phishing-change"></p>
+                </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #2ecc71, #27ae60);">&#10003;</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value legit-val" id="legitimate-sites">0</p>
+                  <p class="dash-metric-label">Legitimate URLs</p>
+                  <p class="dash-metric-change" id="legit-change"></p>
+                </div>
+              </div>
+              <div class="dash-metric-card">
+                <div class="dash-metric-icon" style="background: linear-gradient(135deg, #a855f7, #7c3aed);">%</div>
+                <div class="dash-metric-info">
+                  <p class="dash-metric-value" id="detection-rate">0%</p>
+                  <p class="dash-metric-label">Phishing Rate</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Risk Score Gauge -->
+          <div class="dash-card dash-risk-score-card">
+            <div class="dash-section-header">
+              <h3>Risk Score</h3>
+            </div>
+            <div class="dash-risk-gauge">
+              <canvas id="riskScoreChart"></canvas>
+              <div class="dash-risk-label">
+                <span class="dash-risk-number" id="risk-score-value">0</span>
+                <span class="dash-risk-level" id="risk-score-level">Low</span>
+              </div>
+            </div>
+            <div class="dash-risk-ranges">
+              <div class="dash-risk-range-item">
+                <span class="dash-risk-dot" style="background:#2ecc71"></span>
+                <div><span class="dash-risk-range-label">Low</span><br><span class="dash-risk-range-val">0 - 250</span></div>
+              </div>
+              <div class="dash-risk-range-item">
+                <span class="dash-risk-dot" style="background:#f39c12"></span>
+                <div><span class="dash-risk-range-label">Medium</span><br><span class="dash-risk-range-val">251 - 500</span></div>
+              </div>
+              <div class="dash-risk-range-item">
+                <span class="dash-risk-dot" style="background:#ff6b35"></span>
+                <div><span class="dash-risk-range-label">High</span><br><span class="dash-risk-range-val">501 - 750</span></div>
+              </div>
+              <div class="dash-risk-range-item">
+                <span class="dash-risk-dot" style="background:#ff4757"></span>
+                <div><span class="dash-risk-range-label">Critical</span><br><span class="dash-risk-range-val">751 - 1000</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="dash-charts-row">
+          <div class="dash-card dash-chart-main">
+            <div class="dash-section-header">
+              <h3>Threat Summary</h3>
+              <div style="position: relative;">
+                <button class="dash-filter-btn" id="filter-btn">
+                  <img src="images/filter.png" width="16" alt="Filter"> Filter
+                </button>
+                <div id="filter-menu" style="display: none; position: absolute; right: 0; top: 36px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px; z-index: 100; width: 200px; box-shadow: var(--shadow-card);">
+                  <div class="filter-option" data-range="24h">Last 24 Hours</div>
+                  <div class="filter-option" data-range="3d">Last 3 Days</div>
+                  <div class="filter-option" data-range="7d">Last 7 Days</div>
+                  <div class="filter-option" data-range="custom">Custom Range</div>
+                  <div id="custom-range-inputs" style="display: none; padding: 8px; border-top: 1px solid var(--border-color);">
+                    <label style="font-size: 12px;">Start:</label>
+                    <input type="date" id="start-date" style="width: 100%; margin-bottom: 5px;">
+                    <label style="font-size: 12px;">End:</label>
+                    <input type="date" id="end-date" style="width: 100%; margin-bottom: 5px;">
+                    <p id="filter-date-error" style="display: none; color: #d9534f; font-size: 11px; margin: 4px 0 6px 0; font-weight: 600;"></p>
+                    <button id="apply-custom-filter" style="width: 100%; cursor: pointer;">Apply</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="dash-chart-body">
+              <canvas id="threatChart"></canvas>
+            </div>
+          </div>
+
+          <div class="dash-card dash-chart-side">
+            <div class="dash-section-header">
+              <h3>Detection Breakdown</h3>
+            </div>
+            <div class="dash-chart-body dash-doughnut-body">
+              <canvas id="percentageChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Table -->
+        <div class="dash-card dash-table-card">
+          <div class="dash-section-header">
+            <h3>Threat Details</h3>
+            <button id="clear-history-btn" class="dash-btn-danger">Clear History</button>
+          </div>
+          <div class="dash-table-wrapper">
+            <table id="activity-table" class="dash-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>URL / Type</th>
+                  <th>Result</th>
+                  <th>Confidence</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Rows will be populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="analyse-url-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Phishing URL Analyser</h2>
+        <div style="margin-bottom: 20px;">
+          <label for="model-select"><strong>Detection Model:</strong></label>
+          <select id="model-select" style="margin-left: 10px; padding: 5px 10px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer; width :150px;">
+            <option value="distilbert">DistilBERT</option>
+            <option value="mobilebert">MobileBERT</option>
+          </select>
+          <button id="update-model-btn" style="margin-left: 10px; background-color: #ff9800; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">
+            Update Model
+          </button>
+        </div>
+
+        <!-- Model Update Progress -->
+        <div id="model-update-progress" style="display: none; margin-bottom: 20px; padding: 12px 16px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span id="model-update-label" style="font-size: 13px; font-weight: 600; color: #333;">Downloading model...</span>
+            <span id="model-update-percent" style="font-size: 13px; font-weight: bold; color: #ff9800;">0%</span>
+          </div>
+          <div style="width: 100%; height: 12px; background: #e0e0e0; border-radius: 6px; overflow: hidden;">
+            <div id="model-update-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ff9800, #f57c00); border-radius: 6px; transition: width 0.3s ease;"></div>
+          </div>
+          <p id="model-update-file" style="font-size: 11px; color: #888; margin: 4px 0 0 0;"></p>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+          <label class="switch">
+            <input type="checkbox" id="protectionToggleURL">
+            <span class="slider round"></span>
+          </label>
+          <span style="margin-left: 10px;">Analyse URLs</span>
+        </div>
+        <h3>Analysis Status:</h3>
+        <div class="info">
+          <div id="status">Protection is OFF</div>
+          <br>
+          <div id="confidence"></div>
+        </div>
+
+        <div style="margin-top: 24px;">
+          <h3 style="margin: 0 0 12px 0;">Batch Scan Results</h3>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="refresh-scan-btn" style="background-color: #6c757d; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px;">Refresh</button>
+            <button id="batch-scan-page-btn" style="background-color: #7b1fa2; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px;">Scan Page URLs</button>
+            <button id="scan-page-btn" style="background-color: #2196F3; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px;">Scan Current URL</button>
+          </div>
+        </div>
+        <p id="batch-scan-meta" style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 10px 0;"></p>
+        <div style="overflow-x: auto; max-height: 350px; border: 1px solid #ccc; border-radius: 6px;">
+          <table id="batch-scan-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #c7cef7; position: sticky; top: 0;">
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;"></th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;">URL</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa;">Label</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa;">Confidence</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="batch-scan-tbody">
+              <tr><td colspan="5" style="text-align:center; padding:16px; color: var(--text-muted);">No scan data yet. Scan a page to see results.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Generate Security Report -->
+        <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color, #ddd);">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <button id="generate-report-btn" style="background-color: #e91e63; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px;">
+              Generate Security Report
+            </button>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="report-include-html" style="width: 16px; height: 16px; cursor: pointer;">
+              <span>Include page HTML context</span>
+            </label>
+          </div>
+          <p style="font-size: 11px; color: #888; margin: 6px 0 0 0;">
+            Uses Claude API to generate a structured security analysis from your latest scan results.
+          </p>
+        </div>
+
+        <!-- Security Report Panel -->
+        <div id="security-report-panel" style="display: none; margin-top: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <h3 style="margin: 0;">Security Report</h3>
+            <button id="close-report-btn" style="background: none; border: 1px solid #ccc; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--text-secondary);">Close</button>
+          </div>
+          <div id="security-report-content" style="background: var(--bg-input, #f9f9f9); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-height: 500px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- URL Explain Modal -->
+        <div id="url-explain-panel" style="display: none; margin-top: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <h3 style="margin: 0;">URL Analysis</h3>
+            <button id="close-explain-btn" style="background: none; border: 1px solid #ccc; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; color: var(--text-secondary);">Close</button>
+          </div>
+          <div id="url-explain-content" style="background: var(--bg-input, #f9f9f9); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+        </div>
+      </div>
+
+      <div id="knowledge-base-management-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <h2 style="margin: 0;">Knowledge Base Management</h2>
+          <button id="kb-rebuild-btn" style="background-color: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px;">Rebuild Vector DB</button>
+        </div>
+        <p style="font-size: 14px; color: var(--text-secondary); margin: 0 0 14px 0;">Add or remove Q&amp;A entries. Every change automatically updates the chatbot's knowledge base.</p>
+        <div id="kb-status" style="font-size: 14px; font-style: italic; color: var(--text-secondary); margin-bottom: 10px; min-height: 18px;"></div>
+
+        <!-- Table -->
+        <div style="overflow-x: auto; max-height: 340px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 20px;">
+          <table id="kb-table" style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+              <tr style="background-color: #c7cef7; position: sticky; top: 0;">
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa; width: 36px;">#</th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa; width: 40%;">Question</th>
+                <th style="padding: 8px 10px; text-align: left; border-bottom: 1px solid #aaa;">Answer</th>
+                <th style="padding: 8px 10px; text-align: center; border-bottom: 1px solid #aaa; width: 60px;">Delete</th>
+              </tr>
+            </thead>
+            <tbody id="kb-tbody">
+              <tr><td colspan="4" style="text-align:center; padding:16px; color: var(--text-muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Add Row Form -->
+        <h3 style="margin: 0 0 10px 0;">Add New Entry</h3>
+        <form id="kb-add-form">
+          <div style="margin-bottom: 10px;">
+            <label style="font-weight: bold; font-size: 14px;">Question:</label><br>
+            <input type="text" id="kb-question-input" placeholder="Enter question..."
+              style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px;">
+          </div>
+          <div style="margin-bottom: 14px;">
+            <label style="font-weight: bold; font-size: 14px;">Answer:</label><br>
+            <textarea id="kb-output-input" rows="4" placeholder="Enter answer..."
+              style="margin-top: 5px; width: 90%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; resize: vertical;"></textarea>
+          </div>
+          <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 9px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;">+ Add Entry</button>
+        </form>
+      </div>
+
+      <div id="website-auditing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h3 style="margin-bottom: 10px;">Chat with AI Assistant for Website Auditing</h3>
+
+        <!-- Model selector -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+          <label style="font-weight: bold; font-size: 14px; white-space: nowrap;">AI Model:</label>
+          <select id="chat-model-select" style="padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; font-family: inherit; cursor: pointer;">
+            <option value="starcoder2">StarCoder2 (Local)</option>
+            <option value="claude">Claude API (Anthropic)</option>
+          </select>
+        </div>
+
+        <!-- Topic restriction toggle -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <label class="switch" style="flex-shrink: 0;">
+            <input type="checkbox" id="audit-only-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+          <span style="font-size: 14px;">Restrict to Website Auditing topics only</span>
+        </div>
+
+        <!-- Claude API key row (hidden unless Claude is selected) -->
+        <div id="claude-key-row" style="display: none; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+          <label style="font-weight: bold; font-size: 13px; white-space: nowrap;">API Key:</label>
+          <input type="password" id="claude-api-key-input" placeholder="sk-ant-..." autocomplete="off"
+            style="flex: 1; min-width: 180px; padding: 5px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; font-family: inherit;">
+          <button id="claude-key-save-btn" style="background-color: #4CAF50; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Save</button>
+          <button id="claude-key-clear-btn" style="background-color: #d9534f; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Clear</button>
+          <span id="claude-key-status" style="font-size: 12px; color: var(--text-secondary);"></span>
+        </div>
+
+        <div id="chatLog" class="chat-log"></div>
+        <div class="chat-input-area">
+          <input style="padding-top: 5px; padding-bottom: 5px;" type="text" id="chatInput" placeholder="     Ask StarCoder2..." class="chatInput">
+          <button id="sendMessage">Send Message</button>
+          <button id="clearChat">Clear Chat</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+          <input type="checkbox" id="attach-html-cb" style="width: 16px; height: 16px; cursor: pointer;">
+          <label for="attach-html-cb" style="font-size: 13px; color: var(--text-secondary); cursor: pointer;">Attach current page HTML for auditing</label>
+        </div>
+      </div>
+
+      <div id="cookie-content" class="content-section" style="display: none; padding: 16px;padding-top: 0px; flex-grow: 1;">
+        <h2>Cookies Analyzer</h2>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+          <button id="scan-cookies-btn" style="background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Scan Cookies</button>
+          <label class="cookie-scrape-toggle" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+            <span style="white-space: nowrap;">Cookie Description Lookup</span>
+            <label class="toggle-switch" style="margin: 0;">
+              <input type="checkbox" id="cookie-scrape-toggle" checked>
+              <span class="slider round" style="width:30px; height:30px;"></span>
+            </label>
+          </label>
+        </div>
+        <p id="cookie-scrape-hint" style="font-size: 11px; color: #888; margin: 0 0 10px 0;">
+          <strong>ON:</strong> Fetches cookie descriptions via web scraping (slower, ~15-25s) &nbsp;|&nbsp;
+          <strong>OFF:</strong> Extracts browser cookies only (instant)
+        </p>
+        <p>Retrieved Cookies for Current Website:</p><div></div>
+        <div id="cookie-list"></div>
+      </div>
+      
+
+      <div id="malicious-content-analyser-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Malicious Website Content Analyser</h2>
+        <p>Malicious content analysis functionality will be here.</p>
+        <form>
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <label class="switch">
+              <input type="checkbox" id="warningToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Warning and Highlight Malicious Content</span>
+          </div>
+
+          <div style="display: flex; align-items: center; margin-top: 10px;">
+            <label class="switch">
+              <input type="checkbox" id="protectionToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Remove & Hidden Malicious Content</span>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <button type="button" id="batchScanActionBtn" style="background-color: #7b1fa2; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px;">
+              Perform Enabled Action
+            </button>
+            <p id="batchScanActionStatus" style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 0 0;"></p>
+          </div>
+
+          <div style="display: flex; align-items: center; margin-top: 14px;">
+            <label class="switch">
+              <input type="checkbox" id="blockingPopupToggle">
+              <span class="slider round"></span>
+            </label>
+            <span style="margin-left: 10px;">Block Page with Phishing Warning</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-secondary); margin: 6px 0 0 28px;">
+            Shows a full-page warning before entering websites detected as phishing (&gt;85% = Phishing, 50-84% = Suspicious).
+          </p>
+        </form>
+
+      </div>
+
+      <div id="report-phishing-content" class="content-section" style="display: none; padding: 16px; flex-grow: 1;">
+        <h2>Report Model Error</h2>
+        <p style="color: var(--text-secondary); font-size:15px;">Help improve detection accuracy by reporting incorrect predictions. Submitted reports are used for Federated Learning (Flower + PEFT LoRA) to fine-tune the selected model.</p>
+
+        <form id="report-form">
+          <div style="margin-bottom: 15px;">
+            <label for="report-model-select"><strong>Detection Model:</strong></label><br>
+            <select id="report-model-select" style="margin-top:6px; padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer; width: 200px;">
+              <option value="distilbert">DistilBERT</option>
+              <option value="mobilebert">MobileBERT</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <label for="report-url-input"><strong>URL:</strong></label><br>
+            <input type="text" id="report-url-input" placeholder="Enter URL to report" style="margin-top:6px; width: 85%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 15px;">
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <label for="report-website-type"><strong>True Type of Website:</strong></label><br>
+            <select id="report-website-type" style="margin-top:6px; padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; font-size: 16px; cursor: pointer; width:250px;">
+              <option value="0">Legitimate Website</option>
+              <option value="1">Phishing Website</option>
+            </select>
+          </div>
+
+          <button type="submit" style="background-color: #4CAF50; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Submit Report</button>
+        </form>
+
+        <div id="report-status" style="margin-top: 14px; font-style: italic; color: var(--text-primary);"></div>
+
+        <hr style="margin: 28px 0; border: none; border-top: 1px solid #bbb;">
+
+        <h3>Federated Learning Training</h3>
+        <p style="font-size:15px;">Reports for selected model: <strong id="fl-report-count">0</strong></p>
+
+        <div style="margin-bottom: 14px;">
+          <label><strong>Training Mode:</strong></label><br>
+          <label style="margin-top:6px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="fl-mode" id="fl-mode-local" value="local" checked> Local (runs on this machine)
+          </label><br>
+          <label style="margin-top:4px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="radio" name="fl-mode" id="fl-mode-gcp" value="gcp"> GCP Cloud (centralised server)
+          </label>
+        </div>
+
+        <div id="gcp-url-section" style="display:none; margin-bottom: 14px;">
+          <div style="margin-bottom: 10px;">
+            <label for="gcp-url-input"><strong>GCP Server URL:</strong></label><br>
+            <input type="text" id="gcp-url-input" placeholder="https://fl-server-xxxx-uc.a.run.app"
+              style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+            <p style="font-size:13px; color: var(--text-muted); margin:4px 0 0 0;">Cloud Run service URL from GCP console.</p>
+          </div>
+          <div>
+            <label for="gcp-api-key-input"><strong>API Key:</strong> <span style="font-weight:normal; color: var(--text-secondary);">(optional)</span></label><br>
+            <input type="password" id="gcp-api-key-input" placeholder="Leave blank if not set"
+              style="margin-top:6px; width:85%; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:inherit; font-size:14px;">
+          </div>
+        </div>
+
+        <p style="font-size:14px; color: var(--text-secondary);">Minimum 2 reports required. Training runs LoRA fine-tuning (3 FL rounds). The updated model is saved and used immediately.</p>
+        <button id="fl-train-btn" style="background-color: #2196F3; color: white; border: none; padding: 10px 22px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Train Model Now</button>
+        <div id="fl-status-display" style="margin-top: 12px; font-style: italic; color: var(--text-secondary);"></div>
+      </div>
+
+    </div>
+
+      <img src="images/expand.png" alt="Expand" width="30" height="30" id="resize-handle">
+    
+    <script src="config.js"></script>
+    <script src="scripts/popup.js"></script>
+    <script src="scripts/resize.js"></script>
+  </body>
+</html>

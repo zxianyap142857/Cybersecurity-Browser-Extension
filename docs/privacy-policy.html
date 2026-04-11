@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Cybersecurity Browser Extension</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.7;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #fafafa;
+    }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #1a1a2e; }
+    h2 { font-size: 20px; margin-top: 32px; margin-bottom: 12px; color: #1a1a2e; }
+    p, li { margin-bottom: 12px; font-size: 15px; }
+    ul { padding-left: 24px; }
+    .last-updated { color: #666; font-size: 14px; margin-bottom: 32px; }
+    .contact { background: #f0f0f5; padding: 16px; border-radius: 8px; margin-top: 24px; }
+    a { color: #4a47a3; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">Last updated: April 11, 2026</p>
+  <p><strong>Cybersecurity Browser Extension</strong> is committed to protecting your privacy. This policy explains what data the extension accesses, how it is used, and how it is stored.</p>
+
+  <h2>1. Data Collection</h2>
+  <p>This extension does <strong>not</strong> collect, transmit, or sell any personal information. All data processing occurs locally in your browser or through secure API calls to our backend services solely for the purpose of phishing detection.</p>
+
+  <h2>2. Data Accessed by the Extension</h2>
+  <p>The extension accesses the following data to provide its functionality:</p>
+  <ul>
+    <li><strong>URLs of visited pages</strong> - Scanned in real-time to detect phishing and malicious websites. URLs are sent to the prediction backend for classification and are not stored on any server.</li>
+    <li><strong>Page content (links)</strong> - The extension extracts hyperlinks from web pages for batch scanning. Only URLs are extracted, not page text or personal content.</li>
+    <li><strong>Cookies metadata</strong> - The Cookie Analyzer reads cookie attributes (name, domain, path, HttpOnly, Secure, SameSite) to assess security posture. Cookie values are not collected or transmitted.</li>
+  </ul>
+
+  <h2>3. Data Storage</h2>
+  <p>All user data is stored <strong>locally in your browser</strong> using Chrome's built-in storage API (<code>chrome.storage.local</code>). This includes:</p>
+  <ul>
+    <li>Scan history and dashboard statistics</li>
+    <li>User preferences and settings</li>
+    <li>Batch scan results</li>
+  </ul>
+  <p>No user data is stored on external servers. You can clear all stored data at any time through the extension's dashboard (Clear History button) or by removing the extension.</p>
+
+  <h2>4. Backend Services</h2>
+  <p>The extension communicates with backend services hosted on Google Cloud Run for the following purposes:</p>
+  <ul>
+    <li><strong>Phishing prediction</strong> - URLs are sent to the prediction service for AI-based classification. URLs are processed in real-time and not persisted on the server.</li>
+    <li><strong>Cookie analysis</strong> - Website URLs may be sent to the cookie analysis service for server-side cookie metadata extraction.</li>
+    <li><strong>Knowledge Base</strong> - Q&A entries are stored in a managed knowledge base. This data is user-created content and does not contain personal information.</li>
+  </ul>
+
+  <h2>5. Third-Party Services</h2>
+  <p>The extension may optionally use the <strong>Anthropic Claude API</strong> for AI-powered security reports and website auditing chat. If used, the user provides their own API key, which is stored locally in the browser. Data sent to Claude API is subject to <a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a>.</p>
+
+  <h2>6. Permissions Justification</h2>
+  <ul>
+    <li><strong>activeTab</strong> - Access the current tab URL for phishing scanning</li>
+    <li><strong>scripting</strong> - Extract links from pages and highlight/remove phishing content</li>
+    <li><strong>storage</strong> - Save settings and scan history locally</li>
+    <li><strong>tabs</strong> - Read tab URLs and update badge indicators</li>
+    <li><strong>cookies</strong> - Read cookie metadata for security analysis</li>
+    <li><strong>webNavigation</strong> - Intercept navigation to phishing sites</li>
+  </ul>
+
+  <h2>7. Data Sharing</h2>
+  <p>This extension does <strong>not</strong>:</p>
+  <ul>
+    <li>Sell or share user data with third parties</li>
+    <li>Use data for advertising or tracking</li>
+    <li>Collect personally identifiable information</li>
+    <li>Transfer data to external analytics services</li>
+  </ul>
+
+  <h2>8. User Control</h2>
+  <p>You have full control over your data:</p>
+  <ul>
+    <li>Clear all scan history from the dashboard at any time</li>
+    <li>Toggle protection features on or off</li>
+    <li>Switch between cloud and local backend modes</li>
+    <li>Uninstall the extension to remove all stored data</li>
+  </ul>
+
+  <h2>9. Changes to This Policy</h2>
+  <p>We may update this privacy policy from time to time. Any changes will be reflected on this page with an updated date.</p>
+
+  <div class="contact">
+    <h2 style="margin-top: 0;">10. Contact</h2>
+    <p>If you have questions about this privacy policy, please open an issue on the <a href="https://github.com/" target="_blank">project's GitHub repository</a>.</p>
+  </div>
+</body>
+</html>
