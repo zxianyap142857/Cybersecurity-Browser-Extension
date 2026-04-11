@@ -1,0 +1,10 @@
+question,output
+create an button in HTML,Use <button> I'm the button</button> to create button
+how to prevent xss attack though sanitization,"// Malicious input
+let untrustedInput = ""<img src=x onerror=alert('XSS')>"";
+
+// Sanitized input
+let cleanInput = DOMPurify.sanitize(untrustedInput);
+
+// Result: <img src=""x""> (onerror is removed)
+document.getElementById('content').innerHTML = cleanInput;"
