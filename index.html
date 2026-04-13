@@ -629,7 +629,11 @@
           <li id="report-phishing-link"><a href="#"><img src="images/report issues.png" width="30">Report <br> Phishing <br>Website</a></li>
         </ul>
         <div style="padding: 10px 12px; border-top: 1px solid var(--border-color); margin-top: auto;">
-          <span style="font-size: 10px; color: var(--text-secondary);">Backend: Local (localhost:5000)</span>
+          <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Backend</label>
+          <select id="backend-mode-select" style="width: 100%; padding: 3px 6px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); cursor: pointer;">
+            <option value="local">Local (Dev)</option>
+            <option value="cloud">Cloud</option>
+          </select>
         </div>
       </div>
 
