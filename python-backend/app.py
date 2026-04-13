@@ -96,8 +96,30 @@ _model_update_status = {
 }
 _model_update_lock = threading.Lock()
 
+GCS_PUBLIC_BASE_URL = f'https://storage.googleapis.com/{GCS_BUCKET_NAME}'
+
+# Expected model files for each model
+GCS_MODEL_FILES = {
+    'distilbert': [
+        'config.json',
+        'model.safetensors',
+        'tokenizer.json',
+        'tokenizer_config.json',
+        'special_tokens_map.json',
+        'vocab.txt',
+    ],
+    'mobilebert': [
+        'config.json',
+        'model.safetensors',
+        'tokenizer.json',
+        'tokenizer_config.json',
+        'special_tokens_map.json',
+        'vocab.txt',
+    ],
+}
+
 def _download_model_from_gcs(model_name):
-    """Download model files from GCS to the local model directory with progress tracking."""
+    """Download model files from GCS public URL (no auth needed) with progress tracking."""
     global _model_update_status
     try:
         prefix = GCS_MODEL_PREFIXES.get(model_name)
@@ -107,14 +129,11 @@ def _download_model_from_gcs(model_name):
         local_dir = MODEL_PATHS[model_name]
         os.makedirs(local_dir, exist_ok=True)
 
-        client = gcs.Client()
-        bucket = client.bucket(GCS_BUCKET_NAME)
-        blobs = list(bucket.list_blobs(prefix=prefix))
+        files = GCS_MODEL_FILES.get(model_name, [])
+        if not files:
+            raise ValueError(f"No file list for model: {model_name}")
 
-        if not blobs:
-            raise ValueError(f"No files found in gs://{GCS_BUCKET_NAME}/{prefix}")
-
-        total = len(blobs)
+        total = len(files)
         _model_update_status.update({
             'state': 'downloading',
             'model': model_name,
@@ -125,15 +144,28 @@ def _download_model_from_gcs(model_name):
             'error': None,
         })
 
-        for i, blob in enumerate(blobs):
-            filename = blob.name.split('/')[-1]
-            if not filename:
-                continue
+        for i, filename in enumerate(files):
             _model_update_status['current_file'] = filename
             local_path = os.path.join(local_dir, filename)
 
-            print(f"[ModelUpdate] Downloading {filename} ({i+1}/{total})...")
-            blob.download_to_filename(local_path)
+            # Try public HTTP download first (no auth needed)
+            blob_path = prefix + filename
+            public_url = f'{GCS_PUBLIC_BASE_URL}/{blob_path}'
+            print(f"[ModelUpdate] Downloading {filename} ({i+1}/{total}) from {public_url}...")
+
+            try:
+                resp = requests.get(public_url, stream=True, timeout=120)
+                resp.raise_for_status()
+                with open(local_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            except requests.exceptions.HTTPError:
+                # Fallback to GCS client (requires gcloud auth)
+                print(f"[ModelUpdate] Public URL failed, trying GCS client for {filename}...")
+                client = gcs.Client()
+                bucket = client.bucket(GCS_BUCKET_NAME)
+                blob = bucket.blob(blob_path)
+                blob.download_to_filename(local_path)
 
             _model_update_status['completed_files'] = i + 1
             _model_update_status['progress'] = int(((i + 1) / total) * 100)
