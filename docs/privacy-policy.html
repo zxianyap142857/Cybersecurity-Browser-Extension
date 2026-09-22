@@ -1,99 +1,103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Cybersecurity Browser Extension</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.7;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      background: #fafafa;
-    }
-    h1 { font-size: 28px; margin-bottom: 8px; color: #1a1a2e; }
-    h2 { font-size: 20px; margin-top: 32px; margin-bottom: 12px; color: #1a1a2e; }
-    p, li { margin-bottom: 12px; font-size: 15px; }
-    ul { padding-left: 24px; }
-    .last-updated { color: #666; font-size: 14px; margin-bottom: 32px; }
-    .contact { background: #f0f0f5; padding: 16px; border-radius: 8px; margin-top: 24px; }
-    a { color: #4a47a3; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cybersecurity Browser Extension — Privacy Policy</title>
+<style>
+  body { font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; max-width: 760px; margin: 40px auto; padding: 0 20px; }
+  h1 { font-size: 28px; } h2 { font-size: 20px; margin-top: 32px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f3f3f3; }
+  code { background: #f3f3f3; padding: 1px 5px; border-radius: 3px; }
+  .muted { color: #555; font-size: 14px; }
+</style>
 </head>
 <body>
-  <h1>Privacy Policy</h1>
-  <p class="last-updated">Last updated: April 11, 2026</p>
-  <p><strong>Cybersecurity Browser Extension</strong> is committed to protecting your privacy. This policy explains what data the extension accesses, how it is used, and how it is stored.</p>
+<h1>Cybersecurity Browser Extension — Privacy Policy</h1>
+<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 22 September 2026.</p>
 
-  <h2>1. Data Collection</h2>
-  <p>This extension does <strong>not</strong> collect, transmit, or sell any personal information. All data processing occurs locally in your browser or through secure API calls to our backend services solely for the purpose of phishing detection.</p>
+<p>Cybersecurity Browser Extension is a research project from HELP University that detects phishing web pages and malicious links with machine-learning models. It is designed so that your browsing data stays on your device. This page explains exactly what the extension reads, what it stores, and what leaves your computer.</p>
 
-  <h2>2. Data Accessed by the Extension</h2>
-  <p>The extension accesses the following data to provide its functionality:</p>
-  <ul>
-    <li><strong>URLs of visited pages</strong> - Scanned in real-time to detect phishing and malicious websites. URLs are sent to the prediction backend for classification and are not stored on any server.</li>
-    <li><strong>Page content (links)</strong> - The extension extracts hyperlinks from web pages for batch scanning. Only URLs are extracted, not page text or personal content.</li>
-    <li><strong>Cookies metadata</strong> - The Cookie Analyzer reads cookie attributes (name, domain, path, HttpOnly, Secure, SameSite) to assess security posture. Cookie values are not collected or transmitted.</li>
-  </ul>
+<p class="muted">This replaces the version dated 11 April 2026. Changes: <code>tabs</code> and <code>webNavigation</code> permissions removed;
+<code>webRequest</code>, <code>identity</code>, <code>declarativeNetRequest</code> and <code>privacy</code> added; ad blocking, Privacy Shield,
+federated learning and on-device inference documented; knowledge-base editing restricted to administrators.</p>
 
-  <h2>3. Data Storage</h2>
-  <p>All user data is stored <strong>locally in your browser</strong> using Chrome's built-in storage API (<code>chrome.storage.local</code>). This includes:</p>
-  <ul>
-    <li>Scan history and dashboard statistics</li>
-    <li>User preferences and settings</li>
-    <li>Batch scan results</li>
-  </ul>
-  <p>No user data is stored on external servers. You can clear all stored data at any time through the extension's dashboard (Clear History button) or by removing the extension.</p>
+<h2>1. What the extension reads</h2>
+<ul>
+  <li><strong>The URL and structure of the page you are viewing</strong> — only when you run a scan, or when you have switched on automatic scanning in Settings. The page is parsed inside your browser into a compact text representation of its actionable tags (title, forms, inputs, links, buttons, scripts, meta tags) and 43 numeric features.</li>
+  <li><strong>Links and image sources on the page</strong> — when the Malicious Link Scanner is on.</li>
+  <li><strong>Top-level response headers</strong> — presence and count of security-related headers (for example CSP, HSTS, Set-Cookie). Header <em>values</em> are never stored or transmitted; only yes/no and count signals are derived.</li>
+  <li><strong>Cookies of the current site</strong> — only on the Cookies Analyzer page, to display them to you.</li>
+</ul>
 
-  <h2>4. Backend Services</h2>
-  <p>The extension communicates with backend services hosted on Google Cloud Run for the following purposes:</p>
-  <ul>
-    <li><strong>Phishing prediction</strong> - URLs are sent to the prediction service for AI-based classification. URLs are processed in real-time and not persisted on the server.</li>
-    <li><strong>Cookie analysis</strong> - Website URLs may be sent to the cookie analysis service for server-side cookie metadata extraction.</li>
-    <li><strong>Knowledge Base</strong> - Q&A entries are stored in a managed knowledge base. This data is user-created content and does not contain personal information.</li>
-  </ul>
+<h2>1a. Permissions and why they exist</h2>
+<table>
+  <tr><th>Permission</th><th>Used for</th></tr>
+  <tr><td><code>activeTab</code>, <code>scripting</code></td><td>read and analyse the page you asked to scan; outline or remove flagged links</td></tr>
+  <tr><td><code>storage</code></td><td>your settings, results and history, stored locally</td></tr>
+  <tr><td><code>cookies</code></td><td>the Cookies Analyzer view</td></tr>
+  <tr><td><code>webRequest</code></td><td>observe response headers of the top-level page to derive 14 security signals (observation only; values never stored)</td></tr>
+  <tr><td><code>declarativeNetRequest</code></td><td>Ads Remover and Privacy Shield rule lists; all off by default</td></tr>
+  <tr><td><code>privacy</code></td><td>the optional WebRTC leak protection setting</td></tr>
+  <tr><td><code>identity</code></td><td>Google sign-in for administrators only</td></tr>
+  <tr><td>host permissions <code>http://*/*</code>, <code>https://*/*</code></td><td>scanning, header observation and ad hiding can be needed on any site; the extension cannot know in advance which site is phishing</td></tr>
+</table>
+<p class="muted">Removed since the previous version: <code>tabs</code> and <code>webNavigation</code>.</p>
 
-  <h2>5. Third-Party Services</h2>
-  <p>The extension may optionally use the <strong>Anthropic Claude API</strong> for AI-powered security reports and website auditing chat. If used, the user provides their own API key, which is stored locally in the browser. Data sent to Claude API is subject to <a href="https://www.anthropic.com/privacy" target="_blank">Anthropic's Privacy Policy</a>.</p>
+<h2>2. What is stored on your device</h2>
+<table>
+  <tr><th>Data</th><th>Where</th><th>Purpose</th></tr>
+  <tr><td>Your settings (which protections are on, highlight style, allow-listed sites, chosen model)</td><td>Chrome extension storage</td><td>remember your choices</td></tr>
+  <tr><td>Last scan verdict, scan history, dashboard counters</td><td>Chrome extension storage</td><td>show results and statistics in the popup; you can clear them at any time</td></tr>
+  <tr><td>Reports you submit about wrong verdicts (URL, label)</td><td>the local detection agent on your machine</td><td>local model fine-tuning; never uploaded</td></tr>
+  <tr><td>Your Claude API key (optional)</td><td>Chrome extension storage</td><td>only if you use the website-audit chat; sent only to api.anthropic.com</td></tr>
+  <tr><td>Administrator session token (administrators only)</td><td>Chrome session storage</td><td>deleted when the browser closes</td></tr>
+  <tr><td>Sites you allow ads on; Privacy Shield switches</td><td>Chrome extension storage</td><td>remember your exemptions and protections</td></tr>
+</table>
 
-  <h2>6. Permissions Justification</h2>
-  <ul>
-    <li><strong>activeTab</strong> - Access the current tab URL for phishing scanning</li>
-    <li><strong>scripting</strong> - Extract links from pages and highlight/remove phishing content</li>
-    <li><strong>storage</strong> - Save settings and scan history locally</li>
-    <li><strong>tabs</strong> - Read tab URLs and update badge indicators</li>
-    <li><strong>cookies</strong> - Read cookie metadata for security analysis</li>
-    <li><strong>webNavigation</strong> - Intercept navigation to phishing sites</li>
-  </ul>
+<h2>2a. Administrator functions</h2>
+<p>A small number of functions are restricted to administrators who sign in with Google: updating the models, starting federated
+training, and viewing or editing the chatbot's knowledge base. The sign-in is used only to check the account against a list of
+administrator e-mail addresses; no Google profile data is requested or stored, and ordinary users never sign in. The chatbot
+itself remains available to everyone.</p>
 
-  <h2>7. Data Sharing</h2>
-  <p>This extension does <strong>not</strong>:</p>
-  <ul>
-    <li>Sell or share user data with third parties</li>
-    <li>Use data for advertising or tracking</li>
-    <li>Collect personally identifiable information</li>
-    <li>Transfer data to external analytics services</li>
-  </ul>
+<h2>3. What leaves your device</h2>
+<table>
+  <tr><th>Destination</th><th>What</th><th>When</th></tr>
+  <tr><td><strong>Local detection agent</strong> (<code>127.0.0.1:5000</code>, on your own computer)</td><td>the page URL, the compact text representation, the 43 features and the 14 header signals</td><td>on every scan</td></tr>
+  <tr><td><strong>Our model storage</strong> (Google Cloud Storage, project <code>browser-extension-509309</code>)</td><td>requests to download model files; nothing about you or your pages</td><td>when the agent checks for model updates</td></tr>
+  <tr><td><strong>Federated learning service</strong> (when enabled by an administrator)</td><td>model weight updates (LoRA adapter deltas), a sample count, three model scores plus the corrected label, and a random client identifier</td><td>only after you have submitted reports and training has run locally</td></tr>
+  <tr><td><strong>api.anthropic.com</strong></td><td>the text you type in the audit chat and, if you tick “include page context”, the page text</td><td>only if you have entered your own Claude API key and use the chat</td></tr>
+  <tr><td><strong>Google</strong> (sign-in)</td><td>a Google OAuth token, verified to confirm the account is on the administrator list</td><td>administrators only</td></tr>
+</table>
+<p><strong>Never sent anywhere:</strong> raw page HTML, your browsing history, cookie values, header values, screenshots, keystrokes, or any personal identifier. The Ads Remover records nothing at all about which pages you visit or what it blocked; it keeps only a count of hidden elements for the open tab, in memory.</p>
 
-  <h2>8. User Control</h2>
-  <p>You have full control over your data:</p>
-  <ul>
-    <li>Clear all scan history from the dashboard at any time</li>
-    <li>Toggle protection features on or off</li>
-    <li>Switch between cloud and local backend modes</li>
-    <li>Uninstall the extension to remove all stored data</li>
-  </ul>
+<h2>4. Data we (the developers) collect</h2>
+<p><strong>None.</strong> The developers operate no analytics, no crash reporting and no account system for users. The only server-side data are the federated model updates described above, which contain no page content, no URLs and no identity, and which are automatically deleted after 30 days.</p>
 
-  <h2>9. Changes to This Policy</h2>
-  <p>We may update this privacy policy from time to time. Any changes will be reflected on this page with an updated date.</p>
+<h2>5. Third parties</h2>
+<ul>
+  <li><strong>Google Cloud</strong> hosts the model files and the federated-learning aggregation.</li>
+  <li><strong>Anthropic</strong> (api.anthropic.com) receives chat text only if you configure your own API key; their <a href="https://www.anthropic.com/privacy">privacy policy</a> applies to that traffic.</li>
+</ul>
+<p>We do not sell, share or transfer user data to anyone, and we do not use it for advertising, credit or lending purposes.</p>
 
-  <div class="contact">
-    <h2 style="margin-top: 0;">10. Contact</h2>
-    <p>If you have questions about this privacy policy, please open an issue on the <a href="https://github.com/zxianyap142857/cybersecurity-browser-extension" target="_blank">project's GitHub repository</a>.</p>
-  </div>
+<h2>6. Your choices</h2>
+<ul>
+  <li>Every automatic behaviour (auto page scan, link scanning, blocking, ad removal, Privacy Shield) is off by default and controlled by switches in the popup.</li>
+  <li>The Privacy Shield options (HTTPS upgrade, referrer hiding, tracker blocking, WebRTC protection) are applied by Chrome on your device using packaged rule lists. They do not send traffic through any server and record nothing.</li>
+  <li>“Clear History” on the dashboard deletes stored scan records; removing the extension deletes all extension storage.</li>
+  <li>Reports and local models can be deleted by removing the local agent's data folder.</li>
+</ul>
+
+<h2>7. Changes to this policy</h2>
+<p>If the extension gains a capability that changes what data it reads or sends, this page is updated before that version is
+published, and the date at the top changes. The Chrome Web Store listing always links to the current version. Material changes
+are also noted in the extension's release notes on GitHub.</p>
+
+<h2>8. Contact</h2>
+<p>Questions about this policy: <a href="mailto:b2300174@helplive.edu.my">b2300174@helplive.edu.my</a> (Faculty of Computing and Digital Technology, HELP University).</p>
 </body>
 </html>
