@@ -16,9 +16,11 @@
 </head>
 <body>
 <h1>Cybersecurity Browser Extension — Privacy Policy</h1>
-<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 24 September 2026.</p>
+<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 25 September 2026.</p>
 
 <p>Cybersecurity Browser Extension is a research project from HELP University that detects phishing web pages and malicious links with machine-learning models. It is designed so that your browsing data stays on your device. This page explains exactly what the extension reads, what it stores, and what leaves your computer.</p>
+
+<p class="muted">Changes on 25 September 2026: the Claude API key is kept in memory by default and only saved to disk if you choose <em>Remember on this device</em>.</p>
 
 <p class="muted">Changes on 24 September 2026: contributing to model improvement is now your own opt-in switch (off by default)
 rather than an administrator setting; the random client identifier is no longer sent; flagged verdicts are now kept for 180 days;
@@ -57,7 +59,7 @@ federated learning and on-device inference documented; knowledge-base editing re
   <tr><td>Last scan verdict, scan history, dashboard counters</td><td>Chrome extension storage</td><td>show results and statistics in the popup; you can clear them at any time</td></tr>
   <tr><td>Reports you submit on the Report Phishing Website page (URL, label)</td><td>the local detection agent on your machine</td><td>on-device model training; the reports themselves are never uploaded</td></tr>
   <tr><td>Wrong verdicts you flag on the Page Scan panel (three model scores, label &mdash; no URL)</td><td>the local detection agent on your machine</td><td>shown on the Federated Learning page; shared only if you turn on <em>Contribute to model improvement</em></td></tr>
-  <tr><td>Your Claude API key (optional)</td><td>Chrome extension storage</td><td>only if you use the website-audit chat; sent only to api.anthropic.com</td></tr>
+  <tr><td>Your Claude API key (optional)</td><td>in memory until the browser closes; in Chrome extension storage on this computer only if you tick <em>Remember on this device</em></td><td>only if you use the website-audit chat; sent only to api.anthropic.com</td></tr>
   <tr><td>Administrator session token (administrators only)</td><td>Chrome session storage</td><td>deleted when the browser closes</td></tr>
   <tr><td>Sites you allow ads on; Privacy Shield switches</td><td>Chrome extension storage</td><td>remember your exemptions and protections</td></tr>
 </table>
