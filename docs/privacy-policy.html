@@ -16,11 +16,15 @@
 </head>
 <body>
 <h1>Cybersecurity Browser Extension — Privacy Policy</h1>
-<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 22 September 2026.</p>
+<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 24 September 2026.</p>
 
 <p>Cybersecurity Browser Extension is a research project from HELP University that detects phishing web pages and malicious links with machine-learning models. It is designed so that your browsing data stays on your device. This page explains exactly what the extension reads, what it stores, and what leaves your computer.</p>
 
-<p class="muted">This replaces the version dated 11 April 2026. Changes: <code>tabs</code> and <code>webNavigation</code> permissions removed;
+<p class="muted">Changes on 24 September 2026: contributing to model improvement is now your own opt-in switch (off by default)
+rather than an administrator setting; the random client identifier is no longer sent; flagged verdicts are now kept for 180 days;
+administrator sign-in is checked by our model service; the request logs for contributions are not kept.</p>
+
+<p class="muted">The 22 September 2026 version replaced the one dated 11 April 2026. Changes: <code>tabs</code> and <code>webNavigation</code> permissions removed;
 <code>webRequest</code>, <code>identity</code>, <code>declarativeNetRequest</code> and <code>privacy</code> added; ad blocking, Privacy Shield,
 federated learning and on-device inference documented; knowledge-base editing restricted to administrators.</p>
 
@@ -51,35 +55,51 @@ federated learning and on-device inference documented; knowledge-base editing re
   <tr><th>Data</th><th>Where</th><th>Purpose</th></tr>
   <tr><td>Your settings (which protections are on, highlight style, allow-listed sites, chosen model)</td><td>Chrome extension storage</td><td>remember your choices</td></tr>
   <tr><td>Last scan verdict, scan history, dashboard counters</td><td>Chrome extension storage</td><td>show results and statistics in the popup; you can clear them at any time</td></tr>
-  <tr><td>Reports you submit about wrong verdicts (URL, label)</td><td>the local detection agent on your machine</td><td>local model fine-tuning; never uploaded</td></tr>
+  <tr><td>Reports you submit on the Report Phishing Website page (URL, label)</td><td>the local detection agent on your machine</td><td>on-device model training; the reports themselves are never uploaded</td></tr>
+  <tr><td>Wrong verdicts you flag on the Page Scan panel (three model scores, label &mdash; no URL)</td><td>the local detection agent on your machine</td><td>shown on the Federated Learning page; shared only if you turn on <em>Contribute to model improvement</em></td></tr>
   <tr><td>Your Claude API key (optional)</td><td>Chrome extension storage</td><td>only if you use the website-audit chat; sent only to api.anthropic.com</td></tr>
   <tr><td>Administrator session token (administrators only)</td><td>Chrome session storage</td><td>deleted when the browser closes</td></tr>
   <tr><td>Sites you allow ads on; Privacy Shield switches</td><td>Chrome extension storage</td><td>remember your exemptions and protections</td></tr>
 </table>
 
 <h2>2a. Administrator functions</h2>
-<p>A small number of functions are restricted to administrators who sign in with Google: updating the models, starting federated
-training, and viewing or editing the chatbot's knowledge base. The sign-in is used only to check the account against a list of
-administrator e-mail addresses; no Google profile data is requested or stored, and ordinary users never sign in. The chatbot
-itself remains available to everyone.</p>
+<p>A small number of functions are restricted to administrators who sign in with Google: reviewing and publishing new model
+versions, and viewing or editing the chatbot's knowledge base. The sign-in is checked by our model service in Google Cloud, only
+to compare the account's e-mail address with a list of administrators; no Google profile data is requested or stored, and
+ordinary users never sign in. Training on your own device is not an administrator function &mdash; it is controlled by your own
+<em>Contribute</em> switch (section 3). The chatbot itself remains available to everyone.</p>
 
 <h2>3. What leaves your device</h2>
 <table>
   <tr><th>Destination</th><th>What</th><th>When</th></tr>
   <tr><td><strong>Local detection agent</strong> (<code>127.0.0.1:5000</code>, on your own computer)</td><td>the page URL, the compact text representation, the 43 features and the 14 header signals</td><td>on every scan</td></tr>
-  <tr><td><strong>Our model storage</strong> (Google Cloud Storage, project <code>browser-extension-509309</code>)</td><td>requests to download model files; nothing about you or your pages</td><td>when the agent checks for model updates</td></tr>
-  <tr><td><strong>Federated learning service</strong> (when enabled by an administrator)</td><td>model weight updates (LoRA adapter deltas), a sample count, three model scores plus the corrected label, and a random client identifier</td><td>only after you have submitted reports and training has run locally</td></tr>
+  <tr><td><strong>Our model service</strong> (Google Cloud, project <code>browser-extension-509309</code>)</td><td>requests for the list of current model files and time-limited download links; nothing about you or your pages</td><td>when the agent checks for model updates</td></tr>
+  <tr><td><strong>Our model service &mdash; contributions</strong><br><span class="muted">only if you turn on <em>Contribute to model improvement</em> (off by default)</span></td><td><strong>Flagged verdicts:</strong> the three model scores and the correct label. No URL, no page content.<br><strong>Training updates:</strong> after a training round on your device, the model update it produced (a few MB of numbers), the number of reports used, the model version it was trained from, and the size of the change. No URL, no page content.<br>Neither carries a user, account or device identifier.</td><td>each time you flag a verdict; after each training round you start</td></tr>
   <tr><td><strong>api.anthropic.com</strong></td><td>the text you type in the audit chat and, if you tick “include page context”, the page text</td><td>only if you have entered your own Claude API key and use the chat</td></tr>
-  <tr><td><strong>Google</strong> (sign-in)</td><td>a Google OAuth token, verified to confirm the account is on the administrator list</td><td>administrators only</td></tr>
+  <tr><td><strong>Our model service</strong> (sign-in)</td><td>a Google OAuth token, verified with Google to confirm the account is on the administrator list</td><td>administrators only</td></tr>
 </table>
 <p><strong>Never sent anywhere:</strong> raw page HTML, your browsing history, cookie values, header values, screenshots, keystrokes, or any personal identifier. The Ads Remover records nothing at all about which pages you visit or what it blocked; it keeps only a count of hidden elements for the open tab, in memory.</p>
 
 <h2>4. Data we (the developers) collect</h2>
-<p><strong>None.</strong> The developers operate no analytics, no crash reporting and no account system for users. The only server-side data are the federated model updates described above, which contain no page content, no URLs and no identity, and which are automatically deleted after 30 days.</p>
+<p>The developers operate no analytics, no crash reporting and no account system for users. The only data kept on our side are
+the contributions described in section 3, and only from people who switched contributing on:</p>
+<table>
+  <tr><th>Data</th><th>Kept for</th></tr>
+  <tr><td>Flagged verdicts (three scores and a label)</td><td>180 days, then deleted automatically</td></tr>
+  <tr><td>Training updates</td><td>30 days, then deleted automatically</td></tr>
+</table>
+<p>Each is stored under a random name with only the day it arrived. We do not keep the request logs for these uploads, so your IP
+address is not stored with them (Google, which runs the servers, necessarily sees it while delivering the request). Because nothing
+links a contribution to a person, we cannot find or delete an individual's contributions on request; they expire as listed above.</p>
+<p><strong>A limitation you should know about.</strong> A training update is calculated from the reports on your device. It contains
+no URLs, but research has shown that a model update can sometimes reveal something about the data it was trained on. To reduce
+this, a training round requires at least 32 of your reports, and the size of every update is capped before it leaves your device.
+These measures reduce the risk; they do not remove it entirely. If that matters to you, leave contributing off &mdash; detection
+works the same either way.</p>
 
 <h2>5. Third parties</h2>
 <ul>
-  <li><strong>Google Cloud</strong> hosts the model files and the federated-learning aggregation.</li>
+  <li><strong>Google Cloud</strong> hosts our model service: the model files, administrator sign-in, and contributions from users who opted in.</li>
   <li><strong>Anthropic</strong> (api.anthropic.com) receives chat text only if you configure your own API key; their <a href="https://www.anthropic.com/privacy">privacy policy</a> applies to that traffic.</li>
 </ul>
 <p>We do not sell, share or transfer user data to anyone, and we do not use it for advertising, credit or lending purposes.</p>
@@ -87,6 +107,7 @@ itself remains available to everyone.</p>
 <h2>6. Your choices</h2>
 <ul>
   <li>Every automatic behaviour (auto page scan, link scanning, blocking, ad removal, Privacy Shield) is off by default and controlled by switches in the popup.</li>
+  <li><em>Contribute to model improvement</em> (Federated Learning page, or the agent's tray menu) is off by default. Turning it off stops all further contributions immediately; flagged verdicts saved while it is off stay on your computer.</li>
   <li>The Privacy Shield options (HTTPS upgrade, referrer hiding, tracker blocking, WebRTC protection) are applied by Chrome on your device using packaged rule lists. They do not send traffic through any server and record nothing.</li>
   <li>“Clear History” on the dashboard deletes stored scan records; removing the extension deletes all extension storage.</li>
   <li>Reports and local models can be deleted by removing the local agent's data folder.</li>
