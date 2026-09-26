@@ -16,9 +16,11 @@
 </head>
 <body>
 <h1>Cybersecurity Browser Extension — Privacy Policy</h1>
-<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 25 September 2026.</p>
+<p class="muted">Applies to the Chrome extension “Cybersecurity Browser Extension” (ID <code>bihhhokkeemejefomgfkhfekibekjclf</code>). Last updated 26 September 2026.</p>
 
 <p>Cybersecurity Browser Extension is a research project from HELP University that detects phishing web pages and malicious links with machine-learning models. It is designed so that your browsing data stays on your device. This page explains exactly what the extension reads, what it stores, and what leaves your computer.</p>
+
+<p class="muted">Changes on 26 September 2026: added section 6a, the known security limitations still open after our security review.</p>
 
 <p class="muted">Changes on 25 September 2026: the Claude API key is kept in memory by default and only saved to disk if you choose <em>Remember on this device</em>.</p>
 
@@ -113,6 +115,26 @@ works the same either way.</p>
   <li>The Privacy Shield options (HTTPS upgrade, referrer hiding, tracker blocking, WebRTC protection) are applied by Chrome on your device using packaged rule lists. They do not send traffic through any server and record nothing.</li>
   <li>“Clear History” on the dashboard deletes stored scan records; removing the extension deletes all extension storage.</li>
   <li>Reports and local models can be deleted by removing the local agent's data folder.</li>
+</ul>
+
+<h2>6a. Known security limitations</h2>
+<p>We test the extension and its services for security problems and fix what we find. These known limitations
+are still open; we list them so you can judge them yourself.</p>
+<ul>
+  <li><strong>Another program could impersonate the detection agent while it is not running.</strong> The extension
+    talks to the agent at <code>127.0.0.1:5000</code> on your computer. While the agent runs, no other program can
+    take that address. If the agent is stopped, a program already running on your computer could listen there and
+    receive the page addresses and page summaries the extension sends for scanning. This needs software already
+    installed on your machine; keep the agent running (or use its start-at-login option) if this concerns you.</li>
+  <li><strong>Websites can tell that the extension is installed.</strong> Two small files (a warning icon and a list
+    of ad-hiding rules) must be readable by web pages for the ad and warning features to work, and a site can
+    check for them. This reveals only that the extension is present &mdash; nothing about your browsing or settings.</li>
+  <li><strong>Our contribution service does not yet limit how often it can be called.</strong> This does not expose
+    anything about you. It means someone could send the service large amounts of junk, which could raise our costs;
+    junk is never used without passing the checks before any new model version is published.</li>
+  <li><strong>Administrator sign-out may take up to 8 hours to apply everywhere.</strong> This affects only project
+    administrators, never ordinary users: a signed-out session can remain valid on part of our service until it
+    expires after at most 8 hours.</li>
 </ul>
 
 <h2>7. Changes to this policy</h2>
